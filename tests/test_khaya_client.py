@@ -1,114 +1,350 @@
+"""Unit tests for KhayaClient.
+
+All HTTP calls are mocked via the respx_mock fixture. No live API or API key
+is required. Integration tests live in test_integration.py.
+"""
+
 import pytest
+import httpx
 
 from khaya import KhayaClient
+from khaya.config import Settings
 from khaya.exceptions import (
+    APIError,
     ASRTranscriptionError,
+    AuthenticationError,
+    RateLimitError,
     TranslationError,
     TTSGenerationError,
 )
 
-
-@pytest.mark.parametrize(
-    "task, input, lang",
-    [
-        ("translate", "Hello", "en-tw"),
-        ("transcribe", "tests/me_ho_ye.wav", "tw"),
-        ("synthesize", "Hello", "tw"),
-    ],
-)
-def test_invalid_api_key(task, input, lang):
-    invalid_api_key = "invalid_api_key"
-    khaya_interface = KhayaClient(invalid_api_key)
-
-    # execute the task
-    result = getattr(khaya_interface, task)(input, lang)
-
-    assert "401 Access Denied" in result["message"]
+BASE_URL = "https://translation-api.ghananlp.org"
+TRANSLATE_URL = f"{BASE_URL}/v1/translate"
+TTS_URL = f"{BASE_URL}/tts/v1/tts"
+ASR_URL = f"{BASE_URL}/asr/v1/transcribe"
 
 
-def test_translate_valid(khaya_interface):
-    text = "Hello"
-    translation_pair = "en-tw"
-
-    result = khaya_interface.translate(text, translation_pair)
-
-    assert result.status_code == 200
-    assert result.text is not None
-    assert "error" not in result.text.lower()
+def make_client(api_key: str = "test-api-key", retry_attempts: int = 1) -> KhayaClient:
+    """Return a KhayaClient configured for unit testing (no retries by default)."""
+    config = Settings(api_key=api_key, retry_attempts=retry_attempts)
+    return KhayaClient(api_key=api_key, config=config)
 
 
-def test_translate_error(khaya_interface):
-    text = "Hello"
-    wrong_translation_pair = "en-fw"
-
-    result = khaya_interface.translate(text, wrong_translation_pair)
-
-    assert "error" in result.text.lower()
+# ---------------------------------------------------------------------------
+# Translation
+# ---------------------------------------------------------------------------
 
 
-def test_translate_empty_text(khaya_interface):
-    text = ""
-    translation_pair = "en-tw"
+class TestTranslate:
+    def test_success(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(200, json="Ɛte sɛn?")
+        )
+        result = make_client().translate("Hello", "en-tw")
+        assert result.status_code == 200
 
-    with pytest.raises(TranslationError):
-        result = khaya_interface.translate(text, translation_pair)
+    def test_empty_text_raises_translation_error(self):
+        with pytest.raises(TranslationError):
+            make_client().translate("", "en-tw")
 
-        assert "error" in result.text.lower()
+    def test_empty_pair_raises_translation_error(self):
+        with pytest.raises(TranslationError):
+            make_client().translate("Hello", "")
 
+    def test_missing_api_key_raises_authentication_error(self):
+        with pytest.raises(AuthenticationError):
+            make_client(api_key="").translate("Hello", "en-tw")
 
-def test_tts_valid(khaya_interface):
-    text = "Hello"
-    lang = "tw"
+    def test_401_raises_authentication_error(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(401, text="Access Denied")
+        )
+        with pytest.raises(AuthenticationError):
+            make_client().translate("Hello", "en-tw")
 
-    result = khaya_interface.synthesize(text, lang)
+    def test_429_raises_rate_limit_error(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(429, text="Too Many Requests")
+        )
+        with pytest.raises(RateLimitError):
+            make_client().translate("Hello", "en-tw")
 
-    assert result.status_code == 200
-    assert isinstance(result.content, bytes)
-    assert "error" not in result.text.lower()
-
-
-def test_tts_error(khaya_interface):
-    text = "Hello"
-    wrong_lang = "fw"
-
-    result = khaya_interface.synthesize(text, wrong_lang)
-
-    assert "error" in result.text.lower()
-
-
-def test_tts_empty_text(khaya_interface):
-    text = ""
-    lang = "tw"
-
-    with pytest.raises(TTSGenerationError):
-        result = khaya_interface.synthesize(text, lang)
-
-        assert "error" in result.text.lower()
-
-
-def test_asr_valid(khaya_interface):
-    audio_file_path = "tests/me_ho_ye.wav"
-
-    result = khaya_interface.transcribe(audio_file_path, "tw")
-
-    assert result.status_code == 200
-    assert "error" not in result.text.lower()
-    assert result.json() == "me ho yɛ"
+    def test_500_raises_api_error(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(500, text="Internal Server Error")
+        )
+        with pytest.raises(APIError):
+            make_client().translate("Hello", "en-tw")
 
 
-def test_asr_error_invalid_language(khaya_interface):
-    audio_file_path = "tests/me_ho_ye.wav"
-    wrong_lang = "fw"
-
-    result = khaya_interface.transcribe(audio_file_path, wrong_lang)
-
-    assert "error" in result["message"].lower()
+# ---------------------------------------------------------------------------
+# ASR
+# ---------------------------------------------------------------------------
 
 
-def test_asr_error_nonexistent_file(khaya_interface):
-    audio_file_path = "tests/nonexistent.wav"
+class TestTranscribe:
+    def test_success(self, respx_mock, tmp_path):
+        audio = tmp_path / "test.wav"
+        audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+        respx_mock.post(ASR_URL).mock(
+            return_value=httpx.Response(200, json="me ho ye")
+        )
+        result = make_client().transcribe(str(audio), "tw")
+        assert result.status_code == 200
 
-    with pytest.raises(ASRTranscriptionError):
-        result = khaya_interface.transcribe(audio_file_path, "tw")
+    def test_file_not_found_raises_asr_error(self):
+        with pytest.raises(ASRTranscriptionError):
+            make_client().transcribe("nonexistent/path/audio.wav", "tw")
 
-        assert "error" in result["message"].lower()
+    def test_missing_api_key_raises_authentication_error(self):
+        with pytest.raises(AuthenticationError):
+            make_client(api_key="").transcribe("any.wav", "tw")
+
+    def test_401_raises_authentication_error(self, respx_mock, tmp_path):
+        audio = tmp_path / "test.wav"
+        audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+        respx_mock.post(ASR_URL).mock(
+            return_value=httpx.Response(401, text="Access Denied")
+        )
+        with pytest.raises(AuthenticationError):
+            make_client().transcribe(str(audio), "tw")
+
+    def test_500_raises_api_error(self, respx_mock, tmp_path):
+        audio = tmp_path / "test.wav"
+        audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+        respx_mock.post(ASR_URL).mock(
+            return_value=httpx.Response(500, text="Server Error")
+        )
+        with pytest.raises(APIError):
+            make_client().transcribe(str(audio), "tw")
+
+    def test_language_sent_as_query_param(self, respx_mock, tmp_path):
+        audio = tmp_path / "test.wav"
+        audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+        route = respx_mock.post(ASR_URL).mock(
+            return_value=httpx.Response(200, json="me ho ye")
+        )
+        make_client().transcribe(str(audio), "tw")
+        assert route.calls[0].request.url.params["language"] == "tw"
+
+
+# ---------------------------------------------------------------------------
+# TTS
+# ---------------------------------------------------------------------------
+
+
+class TestSynthesize:
+    def test_success(self, respx_mock):
+        respx_mock.post(TTS_URL).mock(
+            return_value=httpx.Response(200, content=b"\xff\xfb audio bytes")
+        )
+        result = make_client().synthesize("Hello", "tw")
+        assert result.status_code == 200
+        assert isinstance(result.content, bytes)
+
+    def test_empty_text_raises_tts_error(self):
+        with pytest.raises(TTSGenerationError):
+            make_client().synthesize("", "tw")
+
+    def test_empty_language_raises_tts_error(self):
+        with pytest.raises(TTSGenerationError):
+            make_client().synthesize("Hello", "")
+
+    def test_missing_api_key_raises_authentication_error(self):
+        with pytest.raises(AuthenticationError):
+            make_client(api_key="").synthesize("Hello", "tw")
+
+    def test_401_raises_authentication_error(self, respx_mock):
+        respx_mock.post(TTS_URL).mock(
+            return_value=httpx.Response(401, text="Access Denied")
+        )
+        with pytest.raises(AuthenticationError):
+            make_client().synthesize("Hello", "tw")
+
+    def test_429_raises_rate_limit_error(self, respx_mock):
+        respx_mock.post(TTS_URL).mock(
+            return_value=httpx.Response(429, text="Too Many Requests")
+        )
+        with pytest.raises(RateLimitError):
+            make_client().synthesize("Hello", "tw")
+
+    def test_500_raises_api_error(self, respx_mock):
+        respx_mock.post(TTS_URL).mock(
+            return_value=httpx.Response(500, text="Server Error")
+        )
+        with pytest.raises(APIError):
+            make_client().synthesize("Hello", "tw")
+
+
+# ---------------------------------------------------------------------------
+# Retry logic
+# ---------------------------------------------------------------------------
+
+
+class TestRetry:
+    def test_retries_configured_times_on_500(self, respx_mock, monkeypatch):
+        monkeypatch.setattr("time.sleep", lambda _: None)
+        config = Settings(api_key="test-api-key", retry_attempts=3)
+        client = KhayaClient(api_key="test-api-key", config=config)
+
+        route = respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(500, text="Server Error")
+        )
+        with pytest.raises(APIError):
+            client.translate("Hello", "en-tw")
+
+        assert route.call_count == 3
+
+    def test_no_retry_on_401(self, respx_mock, monkeypatch):
+        monkeypatch.setattr("time.sleep", lambda _: None)
+        config = Settings(api_key="test-api-key", retry_attempts=3)
+        client = KhayaClient(api_key="test-api-key", config=config)
+
+        route = respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(401, text="Access Denied")
+        )
+        with pytest.raises(AuthenticationError):
+            client.translate("Hello", "en-tw")
+
+        assert route.call_count == 1
+
+    def test_succeeds_after_transient_failure(self, respx_mock, monkeypatch):
+        monkeypatch.setattr("time.sleep", lambda _: None)
+        config = Settings(api_key="test-api-key", retry_attempts=3)
+        client = KhayaClient(api_key="test-api-key", config=config)
+
+        respx_mock.post(TRANSLATE_URL).mock(
+            side_effect=[
+                httpx.Response(500, text="Error"),
+                httpx.Response(500, text="Error"),
+                httpx.Response(200, json="Ɛte sɛn?"),
+            ]
+        )
+        result = client.translate("Hello", "en-tw")
+        assert result.status_code == 200
+
+    def test_retry_after_header_respected(self, respx_mock, monkeypatch):
+        sleep_calls = []
+        monkeypatch.setattr("time.sleep", lambda d: sleep_calls.append(d))
+        config = Settings(api_key="test-api-key", retry_attempts=2)
+        client = KhayaClient(api_key="test-api-key", config=config)
+
+        respx_mock.post(TRANSLATE_URL).mock(
+            side_effect=[
+                httpx.Response(429, text="Rate limited", headers={"Retry-After": "5"}),
+                httpx.Response(200, json="Ɛte sɛn?"),
+            ]
+        )
+        result = client.translate("Hello", "en-tw")
+        assert result.status_code == 200
+        assert 5.0 in sleep_calls
+
+
+# ---------------------------------------------------------------------------
+# Context managers
+# ---------------------------------------------------------------------------
+
+
+class TestContextManager:
+    def test_sync_context_manager(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(200, json="Ɛte sɛn?")
+        )
+        with KhayaClient("test-api-key") as client:
+            result = client.translate("Hello", "en-tw")
+        assert result.status_code == 200
+
+    async def test_async_context_manager(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(200, json="Ɛte sɛn?")
+        )
+        async with KhayaClient("test-api-key") as client:
+            result = await client.atranslate("Hello", "en-tw")
+        assert result.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Async API
+# ---------------------------------------------------------------------------
+
+
+class TestAsync:
+    async def test_atranslate_success(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(200, json="Ɛte sɛn?")
+        )
+        result = await make_client().atranslate("Hello", "en-tw")
+        assert result.status_code == 200
+
+    async def test_atranslate_empty_text_raises(self):
+        with pytest.raises(TranslationError):
+            await make_client().atranslate("", "en-tw")
+
+    async def test_atranslate_missing_api_key_raises(self):
+        with pytest.raises(AuthenticationError):
+            await make_client(api_key="").atranslate("Hello", "en-tw")
+
+    async def test_atranslate_401_raises_authentication_error(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(401, text="Access Denied")
+        )
+        with pytest.raises(AuthenticationError):
+            await make_client().atranslate("Hello", "en-tw")
+
+    async def test_atranscribe_success(self, respx_mock, tmp_path):
+        audio = tmp_path / "test.wav"
+        audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+        respx_mock.post(ASR_URL).mock(
+            return_value=httpx.Response(200, json="me ho ye")
+        )
+        result = await make_client().atranscribe(str(audio), "tw")
+        assert result.status_code == 200
+
+    async def test_atranscribe_file_not_found_raises(self):
+        with pytest.raises(ASRTranscriptionError):
+            await make_client().atranscribe("nonexistent/audio.wav", "tw")
+
+    async def test_asynthesize_success(self, respx_mock):
+        respx_mock.post(TTS_URL).mock(
+            return_value=httpx.Response(200, content=b"\xff\xfb audio bytes")
+        )
+        result = await make_client().asynthesize("Hello", "tw")
+        assert result.status_code == 200
+        assert isinstance(result.content, bytes)
+
+    async def test_asynthesize_empty_text_raises(self):
+        with pytest.raises(TTSGenerationError):
+            await make_client().asynthesize("", "tw")
+
+    async def test_asynthesize_missing_api_key_raises(self):
+        with pytest.raises(AuthenticationError):
+            await make_client(api_key="").asynthesize("Hello", "tw")
+
+    async def test_asynthesize_401_raises_authentication_error(self, respx_mock):
+        respx_mock.post(TTS_URL).mock(
+            return_value=httpx.Response(401, text="Access Denied")
+        )
+        with pytest.raises(AuthenticationError):
+            await make_client().asynthesize("Hello", "tw")
+
+    async def test_async_retry_on_500(self, respx_mock, monkeypatch):
+        import asyncio
+
+        sleep_calls = []
+
+        async def fake_sleep(d):
+            sleep_calls.append(d)
+
+        monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+        config = Settings(api_key="test-api-key", retry_attempts=2)
+        client = KhayaClient(api_key="test-api-key", config=config)
+
+        respx_mock.post(TRANSLATE_URL).mock(
+            side_effect=[
+                httpx.Response(500, text="Error"),
+                httpx.Response(200, json="Ɛte sɛn?"),
+            ]
+        )
+        result = await client.atranslate("Hello", "en-tw")
+        assert result.status_code == 200
+        assert len(sleep_calls) == 1

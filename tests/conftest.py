@@ -1,18 +1,16 @@
-import os
-
 import pytest
-from dotenv import load_dotenv
 
 from khaya import KhayaClient
-
-os.environ.pop("khaya_api_key", None)  # Remove the key if it exists
-
-load_dotenv()
-khaya_api_key = os.getenv("KHAYA_API_KEY", "test")
+from khaya.config import Settings
 
 
-@pytest.fixture(scope="session")
-def khaya_interface():
-    api_key = khaya_api_key
-    print(api_key)
-    return KhayaClient(api_key)
+@pytest.fixture
+def api_key() -> str:
+    return "test-api-key"
+
+
+@pytest.fixture
+def khaya_client(api_key: str) -> KhayaClient:
+    """KhayaClient configured for unit tests (no retries, no live API)."""
+    config = Settings(api_key=api_key, retry_attempts=1)
+    return KhayaClient(api_key=api_key, config=config)

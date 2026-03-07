@@ -1,108 +1,121 @@
-from typing import Optional
 
-from requests.models import Response
+import httpx
 
-from khaya.services.base_api import BaseApi
+from khaya.config import Settings
 from khaya.services.asr import AsrService
+from khaya.services.base_api import BaseApi
 from khaya.services.translation import TranslationService
 from khaya.services.tts import TtsService
-from khaya.config import Settings
 
-# custom type hint for Response or dict[str, str]
-ResponseOrDict = Response | dict[str, str]
+__version__ = "0.1.0"
 
 
 class KhayaClient:
-    """
-    KhayaClient provides a high-level interface to the Khaya API.
-    It provides methods for translating text, transcribing audio, and synthesizing speech.
+    """High-level interface to the Khaya API.
+
+    Provides translation, automatic speech recognition (ASR), and
+    text-to-speech (TTS) for African languages.
 
     Args:
-        api_key: The API key to use for authenticating requests to the Khaya API.
-        base_url: The base URL of the Khaya API. Default is "https://translation-api.ghananlp.org".
+        api_key: Your Khaya API key. Can also be set via the
+            ``KHAYA_API_KEY`` environment variable.
+        config: Optional pre-built Settings instance. When provided,
+            ``api_key`` is ignored.
 
-    Returns:
-        An instance of the KhayaClient class.
+    Example::
 
+        import os
+        from khaya import KhayaClient
 
-    Example:
+        with KhayaClient(os.environ["KHAYA_API_KEY"]) as khaya:
+            result = khaya.translate("Hello", "en-tw")
+            print(result.json())
 
-    ```python
-    from khaya import KhayaClient
+    Async example::
 
-    import os
-
-    # Initialize the Khaya API interface with your API key assuming you have one saved
-    # in an environment variable called KHAYA_API_KEY
-
-    api_key = os.environ.get("KHAYA_API_KEY")
-
-    khaya = KhayaClient(api_key)
-
-    # Translate text from English to Twi
-    translation_response = khaya.translate("Hello, how are you?", "en-tw")
-    print(translation_response.json())
-
-    # Transcribe an audio file
-    asr_response = khaya.transcribe("path/to/audio/file.wav", "tw")
-    print(asr_response.json())
-
-    # Synthesize speech
-    tts_response = khaya.synthesize("Hello, how are you?", "en")
-    # Save the synthesized speech to a file
-    with open("output.mp3", "wb") as f:
-        f.write(tts_response.content)
-    ```
-
+        async with KhayaClient(api_key) as khaya:
+            result = await khaya.atranslate("Hello", "en-tw")
     """
 
     def __init__(
         self,
         api_key: str,
-        config: Optional[Settings] = None,
-    ):
+        config: Settings | None = None,
+    ) -> None:
         self.config = config if config else Settings(api_key=api_key)
         self.http_client = BaseApi(self.config)
         self.translation = TranslationService(self.http_client)
         self.asr = AsrService(self.http_client)
         self.tts = TtsService(self.http_client)
 
-    def translate(self, text: str, language_pair: str = "en-tw") -> ResponseOrDict:
-        """
-        Translate text from one language to another.
+    # --- Sync context manager ---
+
+    def __enter__(self) -> "KhayaClient":
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.http_client.close()
+
+    # --- Async context manager ---
+
+    async def __aenter__(self) -> "KhayaClient":
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        await self.http_client.aclose()
+
+    # --- Sync API ---
+
+    def translate(self, text: str, language_pair: str = "en-tw") -> httpx.Response:
+        """Translate text from one language to another.
 
         Args:
             text: The text to translate.
-            language_pair: The language pair to translate the text to. Default is "en-tw".
+            language_pair: Source-target language pair (e.g. ``"en-tw"``).
 
         Returns:
-            A Response object containing the translated text.
+            httpx.Response — call ``.json()`` for the translated string.
         """
-
         return self.translation.translate(text, language_pair)
 
-    def transcribe(self, audio_file_path: str, language: str = "tw") -> ResponseOrDict:
-        """
-        Get the transcription of an audio file from a given language.
+    def transcribe(self, audio_file_path: str, language: str = "tw") -> httpx.Response:
+        """Transcribe an audio file to text.
 
         Args:
-            audio_file_path: The path to the audio file to transcribe.
-            language: The language of the audio file. Default is "tw".
+            audio_file_path: Path to the .wav audio file.
+            language: Language spoken in the audio (e.g. ``"tw"`` for Twi).
 
         Returns:
-            A Response object containing the transcription of the audio file.
+            httpx.Response — call ``.json()`` for the transcribed string.
         """
         return self.asr.transcribe(audio_file_path, language)
 
-    def synthesize(self, text: str, lang: str) -> ResponseOrDict:
-        """
-        Synthesize speech from text.
+    def synthesize(self, text: str, language: str) -> httpx.Response:
+        """Synthesize speech from text.
 
         Args:
-            text: The text to synthesize.
-            lang: The language of the text. Default is "tw".
+            text: The text to convert to speech.
+            language: Target language code (e.g. ``"tw"`` for Twi).
 
         Returns:
-            A Response object containing the synthesized speech.
+            httpx.Response — use ``.content`` for the raw audio bytes.
         """
-        return self.tts.synthesize(text, lang)
+        return self.tts.synthesize(text, language)
+
+    # --- Async API ---
+
+    async def atranslate(
+        self, text: str, language_pair: str = "en-tw"
+    ) -> httpx.Response:
+        """Async version of :meth:`translate`."""
+        return await self.translation.atranslate(text, language_pair)
+
+    async def atranscribe(
+        self, audio_file_path: str, language: str = "tw"
+    ) -> httpx.Response:
+        """Async version of :meth:`transcribe`."""
+        return await self.asr.atranscribe(audio_file_path, language)
+
+    async def asynthesize(self, text: str, language: str) -> httpx.Response:
+        """Async version of :meth:`synthesize`."""
+        return await self.tts.asynthesize(text, language)

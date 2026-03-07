@@ -1,15 +1,7 @@
 import logging
 
-logging.basicConfig(level=logging.INFO)
+# SDK convention: use NullHandler so the consuming application controls log output.
+# Users who want logs should add their own handler:
+#   logging.getLogger("khaya").addHandler(logging.StreamHandler())
 logger = logging.getLogger("khaya")
-logger.setLevel(logging.DEBUG)
-
-# add a console handler if none exists
-if not logger.handlers:
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
+logger.addHandler(logging.NullHandler())

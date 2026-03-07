@@ -1,35 +1,58 @@
-from requests.models import Response
+import httpx
 
-from khaya.services.base_api import BaseApi
 from khaya.exceptions import ASRTranscriptionError
+from khaya.services.base_api import BaseApi
 from khaya.utils import check_authentication
 
 
 class AsrService:
-    def __init__(self, http_client: BaseApi):
+    def __init__(self, http_client: BaseApi) -> None:
         self.http_client = http_client
         self.endpoint = http_client.config.endpoints["asr"]
 
     @check_authentication
     def transcribe(
-        self, audio_file_path: str, language="tw"
-    ) -> Response | dict[str, str]:
-        """
-        Convert speech to text from audio binary data in an African language using the GhanaNLP STT API.
+        self, audio_file_path: str, language: str = "tw"
+    ) -> httpx.Response:
+        """Convert speech to text from an audio file.
 
         Args:
-            audio_file_path (str): The path to the audio file.
-            language (str): The language of the audio file.
+            audio_file_path: Path to the audio file (.wav).
+            language: The spoken language code (e.g. "tw" for Twi).
 
         Returns:
-            dict: The transcribed text.
+            httpx.Response containing the transcribed text.
+
+        Raises:
+            ASRTranscriptionError: If the file does not exist.
+            AuthenticationError: If no API key is configured.
+            APIError: On HTTP errors from the API.
         """
         try:
-            url = f"{self.endpoint}?language={language}"
-            with open(audio_file_path, "rb") as db:
-                data = db.read()
+            with open(audio_file_path, "rb") as audio_file:
+                data = audio_file.read()
+        except FileNotFoundError as e:
+            raise ASRTranscriptionError(
+                f"Audio file not found: {audio_file_path}", 400
+            ) from e
 
-            response = self.http_client.request("POST", url, data=data)
-            return response
-        except Exception as e:
-            raise ASRTranscriptionError(str(e), 500)
+        return self.http_client.request(
+            "POST", self.endpoint, params={"language": language}, content=data
+        )
+
+    @check_authentication
+    async def atranscribe(
+        self, audio_file_path: str, language: str = "tw"
+    ) -> httpx.Response:
+        """Async version of transcribe."""
+        try:
+            with open(audio_file_path, "rb") as audio_file:
+                data = audio_file.read()
+        except FileNotFoundError as e:
+            raise ASRTranscriptionError(
+                f"Audio file not found: {audio_file_path}", 400
+            ) from e
+
+        return await self.http_client.arequest(
+            "POST", self.endpoint, params={"language": language}, content=data
+        )
