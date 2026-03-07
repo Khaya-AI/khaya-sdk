@@ -34,3 +34,6 @@ htmlcov/
 # IDEs
 .vscode/
 .idea/
+
+# MkDocs build output
+site/

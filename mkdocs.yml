@@ -1,0 +1,74 @@
+site_name: Khaya SDK
+site_description: Python SDK for the GhanaNLP Khaya API — translation, ASR, and TTS for African languages.
+site_url: https://khaya-sdk.readthedocs.io
+repo_url: https://github.com/Khaya-AI/khaya-sdk
+repo_name: Khaya-AI/khaya-sdk
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: black
+      accent: deep orange
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: black
+      accent: deep orange
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - content.code.annotate
+    - toc.follow
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_source: false
+            show_root_heading: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+            merge_init_into_class: true
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Guides:
+      - Translation: guides/translation.md
+      - Speech Recognition: guides/asr.md
+      - Text-to-Speech: guides/tts.md
+      - Error Handling: guides/error-handling.md
+      - Async Usage: guides/async.md
+      - Configuration: guides/configuration.md
+  - API Reference:
+      - KhayaClient: api-reference/client.md
+      - Exceptions: api-reference/exceptions.md
+      - Configuration: api-reference/config.md
+  - Changelog: changelog.md
