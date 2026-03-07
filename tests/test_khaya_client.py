@@ -4,6 +4,8 @@ All HTTP calls are mocked via the respx_mock fixture. No live API or API key
 is required. Integration tests live in test_integration.py.
 """
 
+import warnings
+
 import pytest
 import httpx
 
@@ -348,3 +350,113 @@ class TestAsync:
         result = await client.atranslate("Hello", "en-tw")
         assert result.status_code == 200
         assert len(sleep_calls) == 1
+
+
+# ---------------------------------------------------------------------------
+# Transport error retry
+# ---------------------------------------------------------------------------
+
+
+class TestTransportErrorRetry:
+    def test_sync_transport_error_retries_then_raises(self, respx_mock, monkeypatch):
+        monkeypatch.setattr("time.sleep", lambda _: None)
+        config = Settings(api_key="test-api-key", retry_attempts=2)
+        client = KhayaClient(api_key="test-api-key", config=config)
+
+        respx_mock.post(TRANSLATE_URL).mock(side_effect=httpx.ConnectError("refused"))
+        with pytest.raises(APIError, match="Transport error"):
+            client.translate("Hello", "en-tw")
+
+    def test_sync_transport_error_succeeds_on_retry(self, respx_mock, monkeypatch):
+        monkeypatch.setattr("time.sleep", lambda _: None)
+        config = Settings(api_key="test-api-key", retry_attempts=2)
+        client = KhayaClient(api_key="test-api-key", config=config)
+
+        respx_mock.post(TRANSLATE_URL).mock(
+            side_effect=[
+                httpx.ConnectError("refused"),
+                httpx.Response(200, json="Ɛte sɛn?"),
+            ]
+        )
+        result = client.translate("Hello", "en-tw")
+        assert result.status_code == 200
+
+    async def test_async_transport_error_retries_then_raises(
+        self, respx_mock, monkeypatch
+    ):
+        import asyncio
+
+        async def noop_sleep(_):
+            pass
+
+        monkeypatch.setattr(asyncio, "sleep", noop_sleep)
+        config = Settings(api_key="test-api-key", retry_attempts=2)
+        client = KhayaClient(api_key="test-api-key", config=config)
+
+        respx_mock.post(TRANSLATE_URL).mock(side_effect=httpx.ConnectError("refused"))
+        with pytest.raises(APIError, match="Transport error"):
+            await client.atranslate("Hello", "en-tw")
+
+
+# ---------------------------------------------------------------------------
+# BaseApi context manager
+# ---------------------------------------------------------------------------
+
+
+class TestBaseApiContextManager:
+    def test_sync_context_manager_closes_client(self):
+        from khaya.config import Settings
+        from khaya.services.base_api import BaseApi
+
+        config = Settings(api_key="test-key")
+        api = BaseApi(config)
+        with api as ctx:
+            assert ctx is api
+        # sync_client is closed after exit — verify it is not usable
+        assert api.sync_client.is_closed
+
+    async def test_async_context_manager_closes_client(self):
+        from khaya.config import Settings
+        from khaya.services.base_api import BaseApi
+
+        config = Settings(api_key="test-key")
+        api = BaseApi(config)
+        async with api as ctx:
+            assert ctx is api
+        assert api.async_client.is_closed
+
+
+# ---------------------------------------------------------------------------
+# Language validation warnings
+# ---------------------------------------------------------------------------
+
+
+class TestLanguageValidationWarnings:
+    def test_unknown_language_pair_warns(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(200, json="...")
+        )
+        with pytest.warns(UserWarning, match="xx-yy"):
+            make_client().translate("Hello", "xx-yy")
+
+    def test_known_language_pair_no_warning(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(200, json="Ɛte sɛn?")
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            make_client().translate("Hello", "en-tw")  # should not raise
+
+    def test_unknown_asr_language_warns(self, respx_mock, tmp_path):
+        audio = tmp_path / "test.wav"
+        audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+        respx_mock.post(ASR_URL).mock(return_value=httpx.Response(200, json="text"))
+        with pytest.warns(UserWarning, match="xx"):
+            make_client().transcribe(str(audio), "xx")
+
+    def test_unknown_tts_language_warns(self, respx_mock):
+        respx_mock.post(TTS_URL).mock(
+            return_value=httpx.Response(200, content=b"audio")
+        )
+        with pytest.warns(UserWarning, match="xx"):
+            make_client().synthesize("Hello", "xx")

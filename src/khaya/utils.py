@@ -1,7 +1,18 @@
 import inspect
+import warnings
 from functools import wraps
 
 from khaya.exceptions import AuthenticationError
+
+
+def warn_if_unknown(value: str, supported: frozenset[str], label: str) -> None:
+    """Emit a UserWarning if *value* is not in *supported*."""
+    if value and value not in supported:
+        warnings.warn(
+            f"Unknown {label} {value!r}. Supported values: {sorted(supported)}",
+            UserWarning,
+            stacklevel=3,
+        )
 
 
 def check_authentication(func):

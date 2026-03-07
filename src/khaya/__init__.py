@@ -1,3 +1,5 @@
+from importlib.metadata import version
+
 from .exceptions import (
     APIError,
     ASRTranscriptionError,
@@ -6,7 +8,9 @@ from .exceptions import (
     TranslationError,
     TTSGenerationError,
 )
-from .khaya_client import KhayaClient, __version__
+from .khaya_client import KhayaClient
+
+__version__ = version("khaya")
 
 __all__ = [
     "KhayaClient",

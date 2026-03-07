@@ -1,8 +1,9 @@
 import httpx
 
+from khaya.constants import SUPPORTED_ASR_LANGUAGES
 from khaya.exceptions import ASRTranscriptionError
 from khaya.services.base_api import BaseApi
-from khaya.utils import check_authentication
+from khaya.utils import check_authentication, warn_if_unknown
 
 
 class AsrService:
@@ -28,6 +29,7 @@ class AsrService:
             AuthenticationError: If no API key is configured.
             APIError: On HTTP errors from the API.
         """
+        warn_if_unknown(language, SUPPORTED_ASR_LANGUAGES, "ASR language")
         try:
             with open(audio_file_path, "rb") as audio_file:
                 data = audio_file.read()
@@ -45,6 +47,7 @@ class AsrService:
         self, audio_file_path: str, language: str = "tw"
     ) -> httpx.Response:
         """Async version of transcribe."""
+        warn_if_unknown(language, SUPPORTED_ASR_LANGUAGES, "ASR language")
         try:
             with open(audio_file_path, "rb") as audio_file:
                 data = audio_file.read()

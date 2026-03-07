@@ -7,8 +7,6 @@ from khaya.services.base_api import BaseApi
 from khaya.services.translation import TranslationService
 from khaya.services.tts import TtsService
 
-__version__ = "0.1.0"
-
 
 class KhayaClient:
     """High-level interface to the Khaya API.

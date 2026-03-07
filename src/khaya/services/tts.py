@@ -1,8 +1,9 @@
 import httpx
 
+from khaya.constants import SUPPORTED_TTS_LANGUAGES
 from khaya.exceptions import TTSGenerationError
 from khaya.services.base_api import BaseApi
-from khaya.utils import check_authentication
+from khaya.utils import check_authentication, warn_if_unknown
 
 
 class TtsService:
@@ -28,6 +29,7 @@ class TtsService:
         """
         if not text or not language:
             raise TTSGenerationError("Text and language are required", 400)
+        warn_if_unknown(language, SUPPORTED_TTS_LANGUAGES, "TTS language")
         payload = {"text": text, "language": language}
         return self.http_client.request("POST", self.endpoint, json=payload)
 
@@ -36,5 +38,6 @@ class TtsService:
         """Async version of synthesize."""
         if not text or not language:
             raise TTSGenerationError("Text and language are required", 400)
+        warn_if_unknown(language, SUPPORTED_TTS_LANGUAGES, "TTS language")
         payload = {"text": text, "language": language}
         return await self.http_client.arequest("POST", self.endpoint, json=payload)

@@ -144,7 +144,7 @@ class BaseApi(ABC):
                     continue
                 raise APIError(f"Transport error: {e}", 0) from e
 
-        if last_exc is not None:
+        if last_exc is not None:  # pragma: no cover
             raise last_exc
         raise APIError("Request failed after retries", 0)  # pragma: no cover
 
@@ -194,6 +194,6 @@ class BaseApi(ABC):
                     continue
                 raise APIError(f"Transport error: {e}", 0) from e
 
-        if last_exc is not None:
+        if last_exc is not None:  # pragma: no cover
             raise last_exc
         raise APIError("Request failed after retries", 0)  # pragma: no cover

@@ -1,8 +1,9 @@
 import httpx
 
+from khaya.constants import SUPPORTED_LANGUAGE_PAIRS
 from khaya.exceptions import TranslationError
 from khaya.services.base_api import BaseApi
-from khaya.utils import check_authentication
+from khaya.utils import check_authentication, warn_if_unknown
 
 
 class TranslationService:
@@ -28,6 +29,7 @@ class TranslationService:
         """
         if not text or not language_pair:
             raise TranslationError("Text and language pair are required", 400)
+        warn_if_unknown(language_pair, SUPPORTED_LANGUAGE_PAIRS, "language pair")
         payload = {"in": text, "lang": language_pair}
         return self.http_client.request("POST", self.endpoint, json=payload)
 
@@ -38,5 +40,6 @@ class TranslationService:
         """Async version of translate."""
         if not text or not language_pair:
             raise TranslationError("Text and language pair are required", 400)
+        warn_if_unknown(language_pair, SUPPORTED_LANGUAGE_PAIRS, "language pair")
         payload = {"in": text, "lang": language_pair}
         return await self.http_client.arequest("POST", self.endpoint, json=payload)
