@@ -7,7 +7,7 @@
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `api_key` | `None` | Your Khaya API key |
-| `base_url` | `https://translation-api.ghananlp.org` | API base URL |
+| `base_url` | `https://translation.ghananlp.org` | API base URL |
 | `timeout` | `30` | Request timeout in seconds |
 | `retry_attempts` | `3` | Number of attempts on transient failures |
 

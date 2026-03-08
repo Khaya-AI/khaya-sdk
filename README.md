@@ -3,6 +3,7 @@
 [![PyPI version](https://badge.fury.io/py/khaya.svg)](https://pypi.org/project/khaya/)
 [![CI](https://github.com/Khaya-AI/khaya-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/Khaya-AI/khaya-sdk/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Docs](https://img.shields.io/badge/docs-khaya--sdk.readthedocs.io-blue)](https://khaya-sdk.readthedocs.io)
 
 Python SDK for the [GhanaNLP](https://ghananlp.org) Khaya API — providing translation, automatic speech recognition (ASR), and text-to-speech (TTS) for African languages.
 
@@ -14,7 +15,7 @@ pip install khaya
 
 ## Authentication
 
-Get an API key at [https://translation-api.ghananlp.org](https://translation-api.ghananlp.org) and set it as an environment variable:
+Get an API key at [https://translation.ghananlp.org](https://translation.ghananlp.org) and set it as an environment variable:
 
 ```bash
 export KHAYA_API_KEY=your_api_key_here

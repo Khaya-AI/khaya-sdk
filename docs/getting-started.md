@@ -18,7 +18,7 @@ Requires Python 3.11 or later.
 
 ## Get an API key
 
-Sign up at [https://translation-api.ghananlp.org](https://translation-api.ghananlp.org) to get your API key.
+Sign up at [https://translation.ghananlp.org](https://translation.ghananlp.org) to get your API key.
 
 ## Authentication
 
