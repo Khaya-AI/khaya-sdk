@@ -2,7 +2,6 @@ import asyncio
 import logging
 import random
 import time
-from abc import ABC
 
 import httpx
 
@@ -35,7 +34,7 @@ def _build_http_exception(response: httpx.Response) -> APIError:
     return APIError(message, status)
 
 
-class BaseApi(ABC):
+class BaseApi:
     def __init__(self, config: Settings) -> None:
         self.config = config
         self.sync_client = httpx.Client(timeout=self.config.timeout)

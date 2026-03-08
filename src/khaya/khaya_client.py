@@ -1,7 +1,6 @@
 
-import httpx
-
 from khaya.config import Settings
+from khaya.models import SynthesisResult, TranscriptionResult, TranslationResult
 from khaya.services.asr import AsrService
 from khaya.services.base_api import BaseApi
 from khaya.services.translation import TranslationService
@@ -27,12 +26,13 @@ class KhayaClient:
 
         with KhayaClient(os.environ["KHAYA_API_KEY"]) as khaya:
             result = khaya.translate("Hello", "en-tw")
-            print(result.json())
+            print(result.text)
 
     Async example::
 
         async with KhayaClient(api_key) as khaya:
             result = await khaya.atranslate("Hello", "en-tw")
+            print(result.text)
     """
 
     def __init__(
@@ -64,7 +64,9 @@ class KhayaClient:
 
     # --- Sync API ---
 
-    def translate(self, text: str, language_pair: str = "en-tw") -> httpx.Response:
+    def translate(
+        self, text: str, language_pair: str = "en-tw"
+    ) -> TranslationResult:
         """Translate text from one language to another.
 
         Args:
@@ -72,11 +74,13 @@ class KhayaClient:
             language_pair: Source-target language pair (e.g. ``"en-tw"``).
 
         Returns:
-            httpx.Response — call ``.json()`` for the translated string.
+            TranslationResult with ``.text``, ``.source_language``, and ``.target_language``.
         """
         return self.translation.translate(text, language_pair)
 
-    def transcribe(self, audio_file_path: str, language: str = "tw") -> httpx.Response:
+    def transcribe(
+        self, audio_file_path: str, language: str = "tw"
+    ) -> TranscriptionResult:
         """Transcribe an audio file to text.
 
         Args:
@@ -84,11 +88,11 @@ class KhayaClient:
             language: Language spoken in the audio (e.g. ``"tw"`` for Twi).
 
         Returns:
-            httpx.Response — call ``.json()`` for the transcribed string.
+            TranscriptionResult with ``.text`` and ``.language``.
         """
         return self.asr.transcribe(audio_file_path, language)
 
-    def synthesize(self, text: str, language: str) -> httpx.Response:
+    def synthesize(self, text: str, language: str) -> SynthesisResult:
         """Synthesize speech from text.
 
         Args:
@@ -96,7 +100,7 @@ class KhayaClient:
             language: Target language code (e.g. ``"tw"`` for Twi).
 
         Returns:
-            httpx.Response — use ``.content`` for the raw audio bytes.
+            SynthesisResult with ``.audio`` bytes and a ``.save(path)`` helper.
         """
         return self.tts.synthesize(text, language)
 
@@ -104,16 +108,16 @@ class KhayaClient:
 
     async def atranslate(
         self, text: str, language_pair: str = "en-tw"
-    ) -> httpx.Response:
+    ) -> TranslationResult:
         """Async version of :meth:`translate`."""
         return await self.translation.atranslate(text, language_pair)
 
     async def atranscribe(
         self, audio_file_path: str, language: str = "tw"
-    ) -> httpx.Response:
+    ) -> TranscriptionResult:
         """Async version of :meth:`transcribe`."""
         return await self.asr.atranscribe(audio_file_path, language)
 
-    async def asynthesize(self, text: str, language: str) -> httpx.Response:
+    async def asynthesize(self, text: str, language: str) -> SynthesisResult:
         """Async version of :meth:`synthesize`."""
         return await self.tts.asynthesize(text, language)

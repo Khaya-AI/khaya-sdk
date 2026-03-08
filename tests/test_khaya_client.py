@@ -4,10 +4,11 @@ All HTTP calls are mocked via the respx_mock fixture. No live API or API key
 is required. Integration tests live in test_integration.py.
 """
 
+import asyncio
 import warnings
 
-import pytest
 import httpx
+import pytest
 
 from khaya import KhayaClient
 from khaya.config import Settings
@@ -19,6 +20,7 @@ from khaya.exceptions import (
     TranslationError,
     TTSGenerationError,
 )
+from khaya.models import SynthesisResult, TranscriptionResult, TranslationResult
 
 BASE_URL = "https://translation.ghananlp.org"
 TRANSLATE_URL = f"{BASE_URL}/v1/translate"
@@ -43,7 +45,10 @@ class TestTranslate:
             return_value=httpx.Response(200, json="Ɛte sɛn?")
         )
         result = make_client().translate("Hello", "en-tw")
-        assert result.status_code == 200
+        assert isinstance(result, TranslationResult)
+        assert result.text == "Ɛte sɛn?"
+        assert result.source_language == "en"
+        assert result.target_language == "tw"
 
     def test_empty_text_raises_translation_error(self):
         with pytest.raises(TranslationError):
@@ -92,7 +97,9 @@ class TestTranscribe:
             return_value=httpx.Response(200, json="me ho ye")
         )
         result = make_client().transcribe(str(audio), "tw")
-        assert result.status_code == 200
+        assert isinstance(result, TranscriptionResult)
+        assert result.text == "me ho ye"
+        assert result.language == "tw"
 
     def test_file_not_found_raises_asr_error(self):
         with pytest.raises(ASRTranscriptionError):
@@ -141,8 +148,18 @@ class TestSynthesize:
             return_value=httpx.Response(200, content=b"\xff\xfb audio bytes")
         )
         result = make_client().synthesize("Hello", "tw")
-        assert result.status_code == 200
-        assert isinstance(result.content, bytes)
+        assert isinstance(result, SynthesisResult)
+        assert isinstance(result.audio, bytes)
+        assert result.language == "tw"
+
+    def test_save_writes_file(self, respx_mock, tmp_path):
+        respx_mock.post(TTS_URL).mock(
+            return_value=httpx.Response(200, content=b"\xff\xfb audio bytes")
+        )
+        result = make_client().synthesize("Hello", "tw")
+        out = tmp_path / "output.wav"
+        result.save(str(out))
+        assert out.read_bytes() == b"\xff\xfb audio bytes"
 
     def test_empty_text_raises_tts_error(self):
         with pytest.raises(TTSGenerationError):
@@ -223,7 +240,7 @@ class TestRetry:
             ]
         )
         result = client.translate("Hello", "en-tw")
-        assert result.status_code == 200
+        assert result.text == "Ɛte sɛn?"
 
     def test_retry_after_header_respected(self, respx_mock, monkeypatch):
         sleep_calls = []
@@ -238,7 +255,7 @@ class TestRetry:
             ]
         )
         result = client.translate("Hello", "en-tw")
-        assert result.status_code == 200
+        assert result.text == "Ɛte sɛn?"
         assert 5.0 in sleep_calls
 
 
@@ -254,7 +271,7 @@ class TestContextManager:
         )
         with KhayaClient("test-api-key") as client:
             result = client.translate("Hello", "en-tw")
-        assert result.status_code == 200
+        assert result.text == "Ɛte sɛn?"
 
     async def test_async_context_manager(self, respx_mock):
         respx_mock.post(TRANSLATE_URL).mock(
@@ -262,7 +279,7 @@ class TestContextManager:
         )
         async with KhayaClient("test-api-key") as client:
             result = await client.atranslate("Hello", "en-tw")
-        assert result.status_code == 200
+        assert result.text == "Ɛte sɛn?"
 
 
 # ---------------------------------------------------------------------------
@@ -276,7 +293,8 @@ class TestAsync:
             return_value=httpx.Response(200, json="Ɛte sɛn?")
         )
         result = await make_client().atranslate("Hello", "en-tw")
-        assert result.status_code == 200
+        assert isinstance(result, TranslationResult)
+        assert result.text == "Ɛte sɛn?"
 
     async def test_atranslate_empty_text_raises(self):
         with pytest.raises(TranslationError):
@@ -300,7 +318,8 @@ class TestAsync:
             return_value=httpx.Response(200, json="me ho ye")
         )
         result = await make_client().atranscribe(str(audio), "tw")
-        assert result.status_code == 200
+        assert isinstance(result, TranscriptionResult)
+        assert result.text == "me ho ye"
 
     async def test_atranscribe_file_not_found_raises(self):
         with pytest.raises(ASRTranscriptionError):
@@ -311,8 +330,8 @@ class TestAsync:
             return_value=httpx.Response(200, content=b"\xff\xfb audio bytes")
         )
         result = await make_client().asynthesize("Hello", "tw")
-        assert result.status_code == 200
-        assert isinstance(result.content, bytes)
+        assert isinstance(result, SynthesisResult)
+        assert isinstance(result.audio, bytes)
 
     async def test_asynthesize_empty_text_raises(self):
         with pytest.raises(TTSGenerationError):
@@ -330,8 +349,6 @@ class TestAsync:
             await make_client().asynthesize("Hello", "tw")
 
     async def test_async_retry_on_500(self, respx_mock, monkeypatch):
-        import asyncio
-
         sleep_calls = []
 
         async def fake_sleep(d):
@@ -348,7 +365,7 @@ class TestAsync:
             ]
         )
         result = await client.atranslate("Hello", "en-tw")
-        assert result.status_code == 200
+        assert result.text == "Ɛte sɛn?"
         assert len(sleep_calls) == 1
 
 
@@ -379,13 +396,11 @@ class TestTransportErrorRetry:
             ]
         )
         result = client.translate("Hello", "en-tw")
-        assert result.status_code == 200
+        assert result.text == "Ɛte sɛn?"
 
     async def test_async_transport_error_retries_then_raises(
         self, respx_mock, monkeypatch
     ):
-        import asyncio
-
         async def noop_sleep(_):
             pass
 
@@ -412,7 +427,6 @@ class TestBaseApiContextManager:
         api = BaseApi(config)
         with api as ctx:
             assert ctx is api
-        # sync_client is closed after exit — verify it is not usable
         assert api.sync_client.is_closed
 
     async def test_async_context_manager_closes_client(self):
@@ -445,7 +459,7 @@ class TestLanguageValidationWarnings:
         )
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            make_client().translate("Hello", "en-tw")  # should not raise
+            make_client().translate("Hello", "en-tw")
 
     def test_unknown_asr_language_warns(self, respx_mock, tmp_path):
         audio = tmp_path / "test.wav"
