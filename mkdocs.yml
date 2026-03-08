@@ -71,6 +71,7 @@ nav:
       - Error Handling: guides/error-handling.md
       - Async Usage: guides/async.md
       - Configuration: guides/configuration.md
+      - Logging: guides/logging.md
   - Internals: internals.md
   - API Reference:
       - KhayaClient: api-reference/client.md

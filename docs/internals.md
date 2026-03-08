@@ -45,6 +45,7 @@ The HTTP transport layer. Owns the `httpx.Client` (sync) and `httpx.AsyncClient`
 - **Retry loop** — up to `config.retry_attempts` attempts on retryable status codes (429, 500, 502, 503, 504) and transport errors
 - **Backoff** — exponential backoff with jitter: `delay = 2^attempt + random(0, 1)` seconds; respects `Retry-After` header on 429 responses
 - **Exception mapping** — converts HTTP error responses to the appropriate `APIError` subclass
+- **Logging** — emits `DEBUG` on every attempt and successful response; `WARNING` on retries and transport errors
 
 ## Class structure
 
@@ -103,6 +104,20 @@ classDiagram
     APIError <|-- TTSGenerationError
     APIError <|-- ASRTranscriptionError
 ```
+
+## Logger hierarchy
+
+All loggers use `logging.getLogger(__name__)`, giving a clean namespace under `khaya`:
+
+```
+khaya                          ← NullHandler (silent by default)
+├── khaya.services.base_api    ← HTTP attempts, retries, backoff, responses
+├── khaya.services.translation ← char count, language pair
+├── khaya.services.asr         ← language, audio file size
+└── khaya.services.tts         ← char count, language, audio output size
+```
+
+See the [Logging guide](guides/logging.md) for how to enable and configure SDK logs.
 
 ## Exception mapping
 

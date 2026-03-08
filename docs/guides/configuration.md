@@ -41,6 +41,18 @@ The SDK retries automatically on:
 
 Retries use exponential backoff with jitter: `delay = 2^attempt + random(0, 1)` seconds.
 
+## Logging
+
+The SDK is silent by default. To enable logs, add a handler to the `khaya` logger:
+
+```python
+import logging
+logging.getLogger("khaya").setLevel(logging.DEBUG)
+logging.getLogger("khaya").addHandler(logging.StreamHandler())
+```
+
+See the [Logging guide](logging.md) for the full logger hierarchy and level reference.
+
 ## Validation
 
 `Settings` uses [Pydantic](https://docs.pydantic.dev) for validation. Invalid configuration raises a `ValidationError` at construction time — not at the first API call:
