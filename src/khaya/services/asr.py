@@ -1,3 +1,5 @@
+import logging
+
 import httpx
 
 from khaya.constants import SUPPORTED_ASR_LANGUAGES
@@ -5,6 +7,8 @@ from khaya.exceptions import ASRTranscriptionError
 from khaya.models import TranscriptionResult
 from khaya.services.base_api import BaseApi
 from khaya.utils import check_authentication, warn_if_unknown
+
+logger = logging.getLogger(__name__)
 
 
 class AsrService:
@@ -31,6 +35,7 @@ class AsrService:
             APIError: On HTTP errors from the API.
         """
         warn_if_unknown(language, SUPPORTED_ASR_LANGUAGES, "ASR language")
+        logger.debug("Transcribing audio file (language=%s)", language)
         try:
             with open(audio_file_path, "rb") as audio_file:
                 data = audio_file.read()
@@ -38,6 +43,7 @@ class AsrService:
             raise ASRTranscriptionError(
                 f"Audio file not found: {audio_file_path}", 400
             ) from e
+        logger.debug("Loaded %d bytes from audio file", len(data))
         response: httpx.Response = self.http_client.request(
             "POST", self.endpoint, params={"language": language}, content=data
         )
@@ -49,6 +55,7 @@ class AsrService:
     ) -> TranscriptionResult:
         """Async version of transcribe."""
         warn_if_unknown(language, SUPPORTED_ASR_LANGUAGES, "ASR language")
+        logger.debug("Transcribing audio file (language=%s)", language)
         try:
             with open(audio_file_path, "rb") as audio_file:
                 data = audio_file.read()
@@ -56,6 +63,7 @@ class AsrService:
             raise ASRTranscriptionError(
                 f"Audio file not found: {audio_file_path}", 400
             ) from e
+        logger.debug("Loaded %d bytes from audio file", len(data))
         response: httpx.Response = await self.http_client.arequest(
             "POST", self.endpoint, params={"language": language}, content=data
         )

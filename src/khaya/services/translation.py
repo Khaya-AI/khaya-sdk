@@ -1,3 +1,5 @@
+import logging
+
 import httpx
 
 from khaya.constants import SUPPORTED_LANGUAGE_PAIRS
@@ -5,6 +7,8 @@ from khaya.exceptions import TranslationError
 from khaya.models import TranslationResult
 from khaya.services.base_api import BaseApi
 from khaya.utils import check_authentication, warn_if_unknown
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_language_pair(language_pair: str) -> tuple[str, str]:
@@ -39,6 +43,7 @@ class TranslationService:
             raise TranslationError("Text and language pair are required", 400)
         warn_if_unknown(language_pair, SUPPORTED_LANGUAGE_PAIRS, "language pair")
         source, target = _parse_language_pair(language_pair)
+        logger.debug("Translating %d chars (%s)", len(text), language_pair)
         response: httpx.Response = self.http_client.request(
             "POST", self.endpoint, json={"in": text, "lang": language_pair}
         )
@@ -55,6 +60,7 @@ class TranslationService:
             raise TranslationError("Text and language pair are required", 400)
         warn_if_unknown(language_pair, SUPPORTED_LANGUAGE_PAIRS, "language pair")
         source, target = _parse_language_pair(language_pair)
+        logger.debug("Translating %d chars (%s)", len(text), language_pair)
         response: httpx.Response = await self.http_client.arequest(
             "POST", self.endpoint, json={"in": text, "lang": language_pair}
         )

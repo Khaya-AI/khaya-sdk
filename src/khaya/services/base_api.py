@@ -8,7 +8,7 @@ import httpx
 from khaya.config import Settings
 from khaya.exceptions import APIError, AuthenticationError, RateLimitError
 
-logger = logging.getLogger("khaya")
+logger = logging.getLogger(__name__)
 
 # Status codes that warrant a retry.
 _RETRYABLE_STATUS_CODES: frozenset[int] = frozenset({429, 500, 502, 503, 504})
@@ -76,11 +76,14 @@ class BaseApi:
             retry_after = response.headers.get("Retry-After")
             if retry_after:
                 try:
-                    time.sleep(float(retry_after))
+                    delay = float(retry_after)
+                    logger.debug("Respecting Retry-After header: sleeping %.1fs", delay)
+                    time.sleep(delay)
                     return
                 except (ValueError, TypeError):
                     pass
         delay = (2**attempt) + random.uniform(0, 1)
+        logger.debug("Backing off %.1fs before next attempt", delay)
         time.sleep(delay)
 
     async def _async_backoff(
@@ -90,11 +93,14 @@ class BaseApi:
             retry_after = response.headers.get("Retry-After")
             if retry_after:
                 try:
-                    await asyncio.sleep(float(retry_after))
+                    delay = float(retry_after)
+                    logger.debug("Respecting Retry-After header: sleeping %.1fs", delay)
+                    await asyncio.sleep(delay)
                     return
                 except (ValueError, TypeError):
                     pass
         delay = (2**attempt) + random.uniform(0, 1)
+        logger.debug("Backing off %.1fs before next attempt", delay)
         await asyncio.sleep(delay)
 
     def request(self, method: str, url: str, **kwargs) -> httpx.Response:
@@ -116,31 +122,48 @@ class BaseApi:
         headers = self._prepare_headers()
         kwargs.setdefault("headers", headers)
         last_exc: APIError | None = None
+        total = self.config.retry_attempts
 
-        for attempt in range(self.config.retry_attempts):
+        for attempt in range(total):
             try:
-                logger.debug("Sync request: %s %s", method, url)
+                logger.debug(
+                    "HTTP %s %s (attempt %d/%d)", method, url, attempt + 1, total
+                )
                 response = self.sync_client.request(method, url, **kwargs)
 
                 if (
                     response.status_code in _RETRYABLE_STATUS_CODES
-                    and attempt < self.config.retry_attempts - 1
+                    and attempt < total - 1
                 ):
                     last_exc = _build_http_exception(response)
+                    logger.warning(
+                        "Received %d from %s %s — retrying (attempt %d/%d)",
+                        response.status_code, method, url, attempt + 1, total,
+                    )
                     self._sync_backoff(attempt, response)
                     continue
 
                 if response.is_error:
                     raise _build_http_exception(response)
 
+                logger.debug(
+                    "Response %d: %s %s", response.status_code, method, url
+                )
                 return response
 
             except APIError:
                 raise
             except httpx.TransportError as e:
-                if attempt < self.config.retry_attempts - 1:
+                if attempt < total - 1:
+                    logger.warning(
+                        "Transport error on %s %s: %s — retrying (attempt %d/%d)",
+                        method, url, e, attempt + 1, total,
+                    )
                     self._sync_backoff(attempt)
                     continue
+                logger.warning(
+                    "Transport error on final attempt: %s %s — %s", method, url, e
+                )
                 raise APIError(f"Transport error: {e}", 0) from e
 
         if last_exc is not None:  # pragma: no cover
@@ -166,31 +189,48 @@ class BaseApi:
         headers = self._prepare_headers()
         kwargs.setdefault("headers", headers)
         last_exc: APIError | None = None
+        total = self.config.retry_attempts
 
-        for attempt in range(self.config.retry_attempts):
+        for attempt in range(total):
             try:
-                logger.debug("Async request: %s %s", method, url)
+                logger.debug(
+                    "HTTP %s %s (attempt %d/%d)", method, url, attempt + 1, total
+                )
                 response = await self.async_client.request(method, url, **kwargs)
 
                 if (
                     response.status_code in _RETRYABLE_STATUS_CODES
-                    and attempt < self.config.retry_attempts - 1
+                    and attempt < total - 1
                 ):
                     last_exc = _build_http_exception(response)
+                    logger.warning(
+                        "Received %d from %s %s — retrying (attempt %d/%d)",
+                        response.status_code, method, url, attempt + 1, total,
+                    )
                     await self._async_backoff(attempt, response)
                     continue
 
                 if response.is_error:
                     raise _build_http_exception(response)
 
+                logger.debug(
+                    "Response %d: %s %s", response.status_code, method, url
+                )
                 return response
 
             except APIError:
                 raise
             except httpx.TransportError as e:
-                if attempt < self.config.retry_attempts - 1:
+                if attempt < total - 1:
+                    logger.warning(
+                        "Transport error on %s %s: %s — retrying (attempt %d/%d)",
+                        method, url, e, attempt + 1, total,
+                    )
                     await self._async_backoff(attempt)
                     continue
+                logger.warning(
+                    "Transport error on final attempt: %s %s — %s", method, url, e
+                )
                 raise APIError(f"Transport error: {e}", 0) from e
 
         if last_exc is not None:  # pragma: no cover
