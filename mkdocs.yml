@@ -47,7 +47,11 @@ plugins:
 markdown_extensions:
   - admonition
   - pymdownx.details
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.inlinehilite
@@ -67,6 +71,7 @@ nav:
       - Error Handling: guides/error-handling.md
       - Async Usage: guides/async.md
       - Configuration: guides/configuration.md
+  - Internals: internals.md
   - API Reference:
       - KhayaClient: api-reference/client.md
       - Exceptions: api-reference/exceptions.md
