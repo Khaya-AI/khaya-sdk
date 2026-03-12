@@ -1,6 +1,6 @@
 [project]
 name = "khaya"
-version = "0.1.0"
+version = "0.1.1"
 description = "Python SDK for the Khaya AI API — translation, ASR, and TTS for African languages"
 authors = [
     {name = "Khaya AI Team", email = "info@khaya.ai"},
