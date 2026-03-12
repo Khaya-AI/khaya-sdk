@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-khaya--sdk.readthedocs.io-blue)](https://khaya-sdk.readthedocs.io)
 
-Python SDK for the [GhanaNLP](https://ghananlp.org) Khaya API — providing translation, automatic speech recognition (ASR), and text-to-speech (TTS) for African languages.
+Python SDK for the [Khaya AI](https://khaya.ai) Khaya API — providing translation, automatic speech recognition (ASR), and text-to-speech (TTS) for African languages.
 
 ## Installation
 
