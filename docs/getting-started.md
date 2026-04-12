@@ -45,7 +45,7 @@ from khaya import KhayaClient
 
 with KhayaClient(os.environ["KHAYA_API_KEY"]) as khaya:
     result = khaya.translate("Good morning", "en-tw")
-    print(result.json())  # "Maakye"
+    print(result.text)  # "Maakye"
 ```
 
 ### Transcribe audio
@@ -53,7 +53,7 @@ with KhayaClient(os.environ["KHAYA_API_KEY"]) as khaya:
 ```python
 with KhayaClient(os.environ["KHAYA_API_KEY"]) as khaya:
     result = khaya.transcribe("recording.wav", "tw")
-    print(result.json())
+    print(result.text)
 ```
 
 ### Synthesize speech
@@ -62,7 +62,7 @@ with KhayaClient(os.environ["KHAYA_API_KEY"]) as khaya:
 with KhayaClient(os.environ["KHAYA_API_KEY"]) as khaya:
     result = khaya.synthesize("Maakye", "tw")
     with open("output.wav", "wb") as f:
-        f.write(result.content)
+        f.write(result.audio)
 ```
 
 ## Using the context manager
