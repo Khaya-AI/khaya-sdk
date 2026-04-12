@@ -51,7 +51,9 @@ The second argument is the **language pair**: `"<source>-<target>"`.
 texts = ["Good morning", "How are you?", "Thank you"]
 
 with KhayaClient(api_key) as khaya:
-    results = [khaya.translate(t, "en-tw").json() for t in texts]
+    results = [khaya.translate(t, "en-tw").text for t in texts]
+
+print(results)
 ```
 
 ## Checking the response
