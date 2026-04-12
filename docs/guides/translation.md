@@ -26,20 +26,20 @@ The second argument is the **language pair**: `"<source>-<target>"`.
 | `gaa-en` | Ga → English |
 | `en-dag` | English → Dagbani |
 | `dag-en` | Dagbani → English |
-| `en-dga` | English → Dagaare |
-| `dga-en` | Dagaare → English |
 | `en-fat` | English → Fante |
 | `fat-en` | Fante → English |
 | `en-gur` | English → Gurene |
 | `gur-en` | Gurene → English |
-| `en-nzi` | English → Nzema |
-| `nzi-en` | Nzema → English |
-| `en-kpo` | English → Ghanaian Pidgin |
-| `kpo-en` | Ghanaian Pidgin → English |
 | `en-yo` | English → Yoruba |
 | `yo-en` | Yoruba → English |
 | `en-ki` | English → Kikuyu |
 | `ki-en` | Kikuyu → English |
+| `en-luo` | English → Luo |
+| `luo-en` | Luo → English |
+| `en-mer` | English → Kimeru |
+| `mer-en` | Kimeru → English |
+| `en-kus` | English → Kusaal |
+| `kus-en` | Kusaal → English |
 
 !!! note
     Passing an unknown language pair raises a `UserWarning` but still sends the request.
