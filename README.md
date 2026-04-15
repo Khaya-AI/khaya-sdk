@@ -102,24 +102,64 @@ except APIError as e:
 | `tw` | Twi |
 | `ee` | Ewe |
 | `gaa` | Ga |
-| `dag` | Dagbani |
-| `dga` | Dagaare |
 | `fat` | Fante |
-| `gur` | Gurene |
-| `nzi` | Nzema |
-| `kpo` | Ghanaian Pidgin |
 | `yo` | Yoruba |
+| `dag` | Dagbani |
 | `ki` | Kikuyu |
+| `gur` | Gurene |
+| `luo` | Luo |
+| `mer` | Kimeru |
+| `kus` | Kusaal |
 
-Language pair format: `"<source>-<target>"`, e.g. `"en-tw"` or `"tw-en"`.
+Language pair format: `"<source>-<target>"`, e.g. `"en-tw"` or `"tw-en"`. All pairs are bidirectional with English as the pivot language.
 
 ### ASR languages
 
-`tw`, `gaa`, `dag`, `ee`, `dga`, `fat`, `gur`, `nzi`, `kpo`, `yo`
+| Code | Language |
+|------|----------|
+| `tw` | Twi |
+| `gaa` | Ga |
+| `dag` | Dagbani |
+| `yo` | Yoruba |
+| `ee` | Ewe |
+| `ki` | Kikuyu |
+| `ha` | Hausa |
 
 ### TTS languages
 
-`tw`, `gaa`, `dag`, `ee`, `yo`
+| Code | Language |
+|------|----------|
+| `ada` | Adangme |
+| `atw` | Akuapem Twi |
+| `twi` | Asante Twi |
+| `dag` | Dagbani |
+| `dga` | Dagaare |
+| `ewe` | Ewe |
+| `fat` | Fante |
+| `fra` | French |
+| `gaa` | Ga |
+| `gjn` | Gonja |
+| `gur` | Gurene |
+| `hau` | Hausa |
+| `ibo` | Igbo |
+| `xsm` | Kasem |
+| `kik` | Kikuyu |
+| `xon` | Konkomba (Likpakpaanl) |
+| `lxn` | Konkomba (Likoonli) |
+| `kri` | Krio |
+| `kus` | Kusaal |
+| `luo` | Luo |
+| `maw` | Mampruli |
+| `men` | Mende |
+| `mer` | Meru / Kimeru |
+| `nzi` | Nzema |
+| `pcm` | Pidgin |
+| `sna` | Shona |
+| `swa` | Swahili |
+| `tem` | Temne |
+| `wlx` | Wali |
+| `wol` | Wolof |
+| `yor` | Yoruba |
 
 ## Configuration
 
