@@ -18,7 +18,7 @@ from khaya import KhayaClient
 async def main():
     async with KhayaClient(os.environ["KHAYA_API_KEY"]) as khaya:
         result = await khaya.atranslate("Good morning", "en-tw")
-        print(result.json())
+        print(result.text)
 
 asyncio.run(main())
 ```
@@ -37,7 +37,7 @@ async def translate_batch(api_key: str, texts: list[str]) -> list[str]:
     async with KhayaClient(api_key) as khaya:
         tasks = [khaya.atranslate(t, "en-tw") for t in texts]
         results = await asyncio.gather(*tasks)
-        return [r.json() for r in results]
+        return [r.text for r in results]
 
 translations = asyncio.run(translate_batch(api_key, ["Hello", "Goodbye", "Thank you"]))
 ```
@@ -51,7 +51,7 @@ async def process(api_key: str, text: str, audio_path: str):
             khaya.atranslate(text, "en-tw"),
             khaya.atranscribe(audio_path, "tw"),
         )
-    return translation.json(), transcript.json()
+    return translation.text, transcript.text
 ```
 
 ## Error handling
@@ -84,7 +84,7 @@ async with KhayaClient(api_key) as khaya:
     @app.get("/translate")
     async def translate(text: str, pair: str = "en-tw"):
         result = await client.atranslate(text, pair)
-        return {"translation": result.json()}
+        return {"translation": result.text}
     ```
 
 === "Django (async view)"
@@ -97,7 +97,7 @@ async with KhayaClient(api_key) as khaya:
         text = request.GET.get("text", "")
         async with KhayaClient(api_key) as khaya:
             result = await khaya.atranslate(text, "en-tw")
-        return JsonResponse({"translation": result.json()})
+        return JsonResponse({"translation": result.text})
     ```
 
 ## When to use async vs sync

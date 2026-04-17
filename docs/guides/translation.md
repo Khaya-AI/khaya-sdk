@@ -9,7 +9,7 @@ from khaya import KhayaClient
 
 with KhayaClient(api_key) as khaya:
     result = khaya.translate("Hello, how are you?", "en-tw")
-    print(result.json())  # "Ɛte sɛn?"
+    print(result.text)  # "Ɛte sɛn?"
 ```
 
 The second argument is the **language pair**: `"<source>-<target>"`.
@@ -51,16 +51,24 @@ The second argument is the **language pair**: `"<source>-<target>"`.
 texts = ["Good morning", "How are you?", "Thank you"]
 
 with KhayaClient(api_key) as khaya:
-    results = [khaya.translate(t, "en-tw").json() for t in texts]
+    results = [khaya.translate(t, "en-tw").text for t in texts]
 ```
 
 ## Checking the response
 
-`translate()` returns an `httpx.Response`. Call `.json()` for the translated string:
+`translate()` returns a `TranslationResult` with three attributes:
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `text` | `str` | The translated string |
+| `source_language` | `str` | Source language code (e.g. `"en"`) |
+| `target_language` | `str` | Target language code (e.g. `"tw"`) |
 
 ```python
 result = khaya.translate("Hello", "en-tw")
-translated: str = result.json()
+print(result.text)            # "Mema wo akye"
+print(result.source_language) # "en"
+print(result.target_language) # "tw"
 ```
 
 ## Error handling

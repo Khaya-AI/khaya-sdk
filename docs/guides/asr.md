@@ -9,7 +9,7 @@ from khaya import KhayaClient
 
 with KhayaClient(api_key) as khaya:
     result = khaya.transcribe("recording.wav", "tw")
-    print(result.json())  # "me ho yɛ"
+    print(result.text)  # "me ho yɛ"
 ```
 
 The second argument is the **language code** of the spoken language in the audio.
@@ -47,9 +47,8 @@ ffmpeg -i input.mp3 -ar 16000 -ac 1 output.wav
 ```python
 with KhayaClient(api_key) as khaya:
     result = khaya.transcribe("speech.wav", "tw")
-    transcript: str = result.json()
     with open("transcript.txt", "w") as f:
-        f.write(transcript)
+        f.write(result.text)
 ```
 
 ## Error handling

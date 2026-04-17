@@ -9,11 +9,24 @@ from khaya import KhayaClient
 
 with KhayaClient(api_key) as khaya:
     result = khaya.synthesize("Maakye", "tw")
-    with open("output.wav", "wb") as f:
-        f.write(result.content)
+    result.save("output.wav")
 ```
 
-The audio is returned as raw bytes in `result.content`.
+Or access the raw bytes directly via `result.audio`:
+
+```python
+with KhayaClient(api_key) as khaya:
+    result = khaya.synthesize("Maakye", "tw")
+    with open("output.wav", "wb") as f:
+        f.write(result.audio)
+```
+
+`synthesize()` returns a `SynthesisResult` with:
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `audio` | `bytes` | Raw audio bytes |
+| `save(path)` | method | Write audio to a file |
 
 ## Supported languages
 
@@ -37,7 +50,7 @@ import sounddevice as sd
 
 with KhayaClient(api_key) as khaya:
     result = khaya.synthesize("Maakye", "tw")
-    data, samplerate = sf.read(io.BytesIO(result.content))
+    data, samplerate = sf.read(io.BytesIO(result.audio))
     sd.play(data, samplerate)
     sd.wait()
 ```
@@ -54,7 +67,7 @@ def split_sentences(text: str) -> list[str]:
 
 with KhayaClient(api_key) as khaya:
     chunks = split_sentences(long_text)
-    audio_parts = [khaya.synthesize(chunk, "tw").content for chunk in chunks]
+    audio_parts = [khaya.synthesize(chunk, "tw").audio for chunk in chunks]
 
 combined = b"".join(audio_parts)
 with open("output.wav", "wb") as f:
