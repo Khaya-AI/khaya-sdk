@@ -75,6 +75,7 @@ nav:
   - Internals: internals.md
   - API Reference:
       - KhayaClient: api-reference/client.md
+      - Result Types: api-reference/models.md
       - Exceptions: api-reference/exceptions.md
       - Configuration: api-reference/config.md
   - Changelog: changelog.md

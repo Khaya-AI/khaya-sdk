@@ -60,11 +60,11 @@ The SDK never logs at `INFO`, `ERROR`, or `CRITICAL` — errors are communicated
 With `DEBUG` enabled on `khaya.services.base_api`, a request that retries once looks like:
 
 ```
-DEBUG khaya.services.base_api: HTTP POST https://translation.ghananlp.org/v1/translate (attempt 1/3)
-WARNING khaya.services.base_api: Received 500 from POST https://translation.ghananlp.org/v1/translate — retrying (attempt 1/3)
+DEBUG khaya.services.base_api: HTTP POST https://translation-api.ghananlp.org/v1/translate (attempt 1/3)
+WARNING khaya.services.base_api: Received 500 from POST https://translation-api.ghananlp.org/v1/translate — retrying (attempt 1/3)
 DEBUG khaya.services.base_api: Backing off 1.4s before next attempt
-DEBUG khaya.services.base_api: HTTP POST https://translation.ghananlp.org/v1/translate (attempt 2/3)
-DEBUG khaya.services.base_api: Response 200: POST https://translation.ghananlp.org/v1/translate
+DEBUG khaya.services.base_api: HTTP POST https://translation-api.ghananlp.org/v1/translate (attempt 2/3)
+DEBUG khaya.services.base_api: Response 200: POST https://translation-api.ghananlp.org/v1/translate
 ```
 
 ## Integrating with structured logging

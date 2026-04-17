@@ -15,7 +15,7 @@ flowchart TD
     C -->|synthesize / asynthesize| F[TtsService]
     D & E & F --> G[BaseApi\nrequest / arequest]
     G --> H{Attempt}
-    H -->|success 2xx| I([httpx.Response])
+    H -->|success 2xx| I([TranslationResult / TranscriptionResult / SynthesisResult])
     H -->|retryable\n429 · 5xx · network| J[Backoff & retry]
     J --> H
     H -->|401| K([AuthenticationError])

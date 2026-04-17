@@ -65,7 +65,6 @@ with KhayaClient(api_key) as khaya:
 | `target_language` | `str` | Target language code (e.g. `"tw"`) |
 
 ```python
-result = khaya.translate("Hello", "en-tw")
 print(result.text)            # "Mema wo akye"
 print(result.source_language) # "en"
 print(result.target_language) # "tw"

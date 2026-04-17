@@ -14,6 +14,14 @@ with KhayaClient(api_key) as khaya:
 
 The second argument is the **language code** of the spoken language in the audio.
 
+`transcribe()` returns a `TranscriptionResult` with:
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `text` | `str` | The transcribed string |
+| `language` | `str` | Language code of the audio (e.g. `"tw"`) |
+
+
 ## Supported languages
 
 | Code | Language |
