@@ -22,7 +22,7 @@ from khaya.exceptions import (
 )
 from khaya.models import SynthesisResult, TranscriptionResult, TranslationResult
 
-BASE_URL = "https://translation.ghananlp.org"
+BASE_URL = "https://translation-api.ghananlp.org"
 TRANSLATE_URL = f"{BASE_URL}/v1/translate"
 TTS_URL = f"{BASE_URL}/tts/v1/tts"
 ASR_URL = f"{BASE_URL}/asr/v1/transcribe"
