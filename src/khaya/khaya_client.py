@@ -92,17 +92,24 @@ class KhayaClient:
         """
         return self.asr.transcribe(audio_file_path, language)
 
-    def synthesize(self, text: str, language: str) -> SynthesisResult:
+    def synthesize(
+        self,
+        text: str,
+        language: str,
+        speaker: str | None = None,
+    ) -> SynthesisResult:
         """Synthesize speech from text.
 
         Args:
             text: The text to convert to speech.
-            language: Target language code (e.g. ``"tw"`` for Twi).
+            language: Target language code (e.g. ``"twi"`` for Asante Twi).
+            speaker: Optional speaker voice — ``"male_low"``, ``"male_high"``,
+                or ``"female"``.
 
         Returns:
             SynthesisResult with ``.audio`` bytes and a ``.save(path)`` helper.
         """
-        return self.tts.synthesize(text, language)
+        return self.tts.synthesize(text, language, speaker)
 
     # --- Async API ---
 
@@ -118,6 +125,11 @@ class KhayaClient:
         """Async version of :meth:`transcribe`."""
         return await self.asr.atranscribe(audio_file_path, language)
 
-    async def asynthesize(self, text: str, language: str) -> SynthesisResult:
+    async def asynthesize(
+        self,
+        text: str,
+        language: str,
+        speaker: str | None = None,
+    ) -> SynthesisResult:
         """Async version of :meth:`synthesize`."""
-        return await self.tts.asynthesize(text, language)
+        return await self.tts.asynthesize(text, language, speaker)

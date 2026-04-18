@@ -33,7 +33,7 @@ def test_extra_fields_are_forbidden():
 
 def test_http_base_url_rejected():
     with pytest.raises(ValidationError, match="HTTPS"):
-        Settings(api_key="key", base_url="https://translation-api.ghananlp.org")
+        Settings(api_key="key", base_url="http://translation-api.ghananlp.org")
 
 
 def test_custom_timeout_and_retries():
