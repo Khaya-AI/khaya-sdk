@@ -6,7 +6,7 @@ from khaya.constants import RETRY_ATTEMPTS, TIMEOUT
 
 
 class Settings(BaseSettings):
-    api_key: str | None = Field(default=None, alias="KHAYA_API_KEY")
+    api_key: str | None = Field(default=None, validation_alias="KHAYA_API_KEY")
     base_url: str = "https://translation-api.ghananlp.org"
     timeout: int = TIMEOUT
     retry_attempts: int = RETRY_ATTEMPTS
