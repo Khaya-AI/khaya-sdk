@@ -6,7 +6,7 @@ from khaya.constants import RETRY_ATTEMPTS, TIMEOUT
 
 
 class Settings(BaseSettings):
-    api_key: str | None = Field(default=None)
+    api_key: str | None = Field(default=None, validation_alias="KHAYA_API_KEY")
     base_url: str = "https://translation-api.ghananlp.org"
     timeout: int = TIMEOUT
     retry_attempts: int = RETRY_ATTEMPTS
@@ -17,24 +17,21 @@ class Settings(BaseSettings):
 
     @field_validator("base_url")
     @classmethod
-    def validate_https(cls, v: str) -> str:
+    def base_url_must_use_https(cls, v: str) -> str:
         if not v.startswith("https://"):
-            raise ValueError(f"base_url must use HTTPS, got: {v!r}")
+            raise ValueError("HTTPS is required for base_url")
         return v
 
     @property
     def endpoints(self) -> dict[str, str]:
         return {
             "translation": f"{self.base_url}/v1/translate",
-            "tts": f"{self.base_url}/tts/v1/tts",
             "asr": f"{self.base_url}/asr/v1/transcribe",
+            "tts": f"{self.base_url}/tts/v1/tts",
         }
 
 
 class DevSettings(Settings):
-    """Development settings: automatically load from a .env file."""
-
-    api_key: str | None = Field(default=None, alias="KHAYA_API_KEY")
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="forbid"
+        env_file=".env", extra="forbid", populate_by_name=True
     )

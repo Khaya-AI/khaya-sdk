@@ -21,20 +21,41 @@ The second argument is the **language code** of the spoken language in the audio
 | `text` | `str` | The transcribed string |
 | `language` | `str` | Language code of the audio (e.g. `"tw"`) |
 
-
 ## Supported languages
 
 | Code | Language |
 |------|----------|
-| `tw` | Twi |
-| `gaa` | Ga |
+| `ada` | Adangme |
+| `en_gh` | African English |
+| `atw` | Akuapem Twi |
+| `tw` | Asante Twi |
+| `dga` | Dagaare |
 | `dag` | Dagbani |
 | `ee` | Ewe |
-| `dga` | Dagaare |
 | `fat` | Fante |
+| `fra` | French |
+| `gaa` | Ga |
+| `gon` | Gonja |
 | `gur` | Gurene |
+| `ha` | Hausa |
+| `ig` | Igbo |
+| `kas` | Kasem |
+| `ki` | Kikuyu |
+| `kon_k` | Konkomba (Likoonli) |
+| `kon_l` | Konkomba (Likpakpaanl) |
+| `kri` | Krio |
+| `kus` | Kusaal |
+| `luo` | Luo |
+| `mam` | Mampruli |
+| `men` | Mende |
+| `mer` | Meru/Kimeru |
 | `nzi` | Nzema |
-| `kpo` | Ghanaian Pidgin |
+| `pid` | Pidgin |
+| `sn` | Shona |
+| `sw` | Swahili |
+| `tem` | Temne |
+| `wal` | Wali |
+| `wo` | Wolof |
 | `yo` | Yoruba |
 
 ## Audio requirements
