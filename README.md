@@ -129,7 +129,7 @@ Language pair format: `"<source>-<target>"`, e.g. `"en-tw"` or `"tw-en"`. All pa
 
 | Code | Language |
 |------|----------|
-| `ada` | Adangme |
+| `ada` | Dangme |
 | `atw` | Akuapem Twi |
 | `twi` | Asante Twi |
 | `dag` | Dagbani |

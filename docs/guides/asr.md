@@ -25,7 +25,7 @@ The second argument is the **language code** of the spoken language in the audio
 
 | Code | Language |
 |------|----------|
-| `ada` | Adangme |
+| `ada` | Dangme |
 | `en_gh` | African English |
 | `atw` | Akuapem Twi |
 | `tw` | Asante Twi |

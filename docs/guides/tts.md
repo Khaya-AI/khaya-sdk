@@ -36,7 +36,7 @@ with KhayaClient(api_key) as khaya:
 
 | Code | Language |
 |------|----------|
-| `ada` | Adangme |
+| `ada` | Dangme |
 | `atw` | Akuapem Twi |
 | `twi` | Asante Twi |
 | `dag` | Dagbani |
