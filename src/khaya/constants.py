@@ -45,7 +45,7 @@ SUPPORTED_LANGUAGE_PAIRS: frozenset[str] = frozenset(
 # and may drift. Treat as indicative, not authoritative.
 SUPPORTED_ASR_LANGUAGES: frozenset[str] = frozenset(
     {
-        "ada",  # Adangme
+        "ada",  # Dangme
         "en_gh",  # African English
         "atw",  # Akuapem Twi
         "tw",  # Asante Twi
@@ -86,7 +86,7 @@ SUPPORTED_ASR_LANGUAGES: frozenset[str] = frozenset(
 # Note: TTS language codes differ from ASR codes for the same language.
 SUPPORTED_TTS_LANGUAGES: frozenset[str] = frozenset(
     {
-        "ada",  # Adangme
+        "ada",  # Dangme
         "atw",  # Akuapem Twi
         "twi",  # Asante Twi
         "dag",  # Dagbani
