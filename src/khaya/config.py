@@ -1,4 +1,3 @@
-
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -8,12 +7,11 @@ from khaya.constants import RETRY_ATTEMPTS, TIMEOUT
 class Settings(BaseSettings):
     api_key: str | None = Field(default=None, validation_alias="KHAYA_API_KEY")
     base_url: str = "https://translation-api.ghananlp.org"
-    timeout: int = TIMEOUT
-    retry_attempts: int = RETRY_ATTEMPTS
+    timeout: int = Field(default=TIMEOUT, gt=0)
+    # At least one attempt: retry_attempts=0 would skip the request entirely.
+    retry_attempts: int = Field(default=RETRY_ATTEMPTS, ge=1)
 
-    model_config = SettingsConfigDict(
-        env_file=None, extra="forbid", populate_by_name=True
-    )
+    model_config = SettingsConfigDict(env_file=None, extra="forbid", populate_by_name=True)
 
     @field_validator("base_url")
     @classmethod
@@ -32,6 +30,4 @@ class Settings(BaseSettings):
 
 
 class DevSettings(Settings):
-    model_config = SettingsConfigDict(
-        env_file=".env", extra="forbid", populate_by_name=True
-    )
+    model_config = SettingsConfigDict(env_file=".env", extra="forbid", populate_by_name=True)

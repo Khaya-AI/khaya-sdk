@@ -42,8 +42,13 @@ The second argument is the **language pair**: `"<source>-<target>"`.
 | `kus-en` | Kusaal → English |
 
 !!! note
-    Passing an unknown language pair raises a `UserWarning` but still sends the request.
-    This allows you to use new pairs the API supports before the SDK is updated.
+    The table above is reference data, not a whitelist — the SDK does not validate
+    language codes and will send whatever you pass. The API accepts several spellings
+    for the same language (`en-tw`, `en-twi` and `eng-twi` all translate to Twi), so
+    you can use any pair the API supports without waiting for an SDK release.
+
+    An unsupported pair is rejected by the API with an `APIError` carrying
+    `code="VALIDATION_FAILED"` and a `details` entry naming the offending field.
 
 ## Translating multiple strings
 

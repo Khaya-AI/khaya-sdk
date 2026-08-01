@@ -2,11 +2,10 @@ import logging
 
 import httpx
 
-from khaya.constants import SUPPORTED_LANGUAGE_PAIRS
 from khaya.exceptions import TranslationError
 from khaya.models import TranslationResult
-from khaya.services.base_api import BaseApi
-from khaya.utils import check_authentication, warn_if_unknown
+from khaya.services.base_api import BaseApi, decode_json
+from khaya.utils import check_authentication
 
 logger = logging.getLogger(__name__)
 
@@ -37,33 +36,30 @@ class TranslationService:
         Raises:
             TranslationError: If text or language_pair are empty.
             AuthenticationError: If no API key is configured.
-            APIError: On HTTP errors from the API.
+            APIError: On HTTP errors from the API, including an unsupported
+                language pair.
         """
         if not text or not language_pair:
             raise TranslationError("Text and language pair are required", 400)
-        warn_if_unknown(language_pair, SUPPORTED_LANGUAGE_PAIRS, "language pair")
         source, target = _parse_language_pair(language_pair)
         logger.debug("Translating %d chars (%s)", len(text), language_pair)
         response: httpx.Response = self.http_client.request(
             "POST", self.endpoint, json={"in": text, "lang": language_pair}
         )
         return TranslationResult(
-            text=response.json(), source_language=source, target_language=target
+            text=decode_json(response), source_language=source, target_language=target
         )
 
     @check_authentication
-    async def atranslate(
-        self, text: str, language_pair: str = "en-tw"
-    ) -> TranslationResult:
+    async def atranslate(self, text: str, language_pair: str = "en-tw") -> TranslationResult:
         """Async version of translate."""
         if not text or not language_pair:
             raise TranslationError("Text and language pair are required", 400)
-        warn_if_unknown(language_pair, SUPPORTED_LANGUAGE_PAIRS, "language pair")
         source, target = _parse_language_pair(language_pair)
         logger.debug("Translating %d chars (%s)", len(text), language_pair)
         response: httpx.Response = await self.http_client.arequest(
             "POST", self.endpoint, json={"in": text, "lang": language_pair}
         )
         return TranslationResult(
-            text=response.json(), source_language=source, target_language=target
+            text=decode_json(response), source_language=source, target_language=target
         )

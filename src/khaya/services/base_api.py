@@ -1,7 +1,9 @@
 import asyncio
 import logging
 import random
+import re
 import time
+from typing import Any
 
 import httpx
 
@@ -13,32 +15,146 @@ logger = logging.getLogger(__name__)
 # Status codes that warrant a retry.
 _RETRYABLE_STATUS_CODES: frozenset[int] = frozenset({429, 500, 502, 503, 504})
 
+# Upper bound on a server-supplied Retry-After delay. Without a cap, a
+# misconfigured or hostile server can block the caller indefinitely.
+MAX_RETRY_AFTER_SECONDS = 60.0
+
+# Error bodies are not always JSON — gateways return HTML pages. Keep the
+# fallback message short rather than embedding a whole document.
+_MAX_SNIPPET_CHARS = 200
+
+
+def _non_json_message(response: httpx.Response) -> str:
+    """Build a readable message from a non-JSON error body.
+
+    Gateways return full HTML pages when a backend is unavailable; the useful
+    signal is the page title, not several kilobytes of inline CSS.
+    """
+    prefix = f"HTTP {response.status_code}"
+    text = response.text
+    title = re.search(r"<title[^>]*>(.*?)</title>", text, re.IGNORECASE | re.DOTALL)
+    if title:
+        summary = " ".join(title.group(1).split())
+        if summary:
+            return f"{prefix}: {summary} (non-JSON response from the API gateway)"
+    snippet = " ".join(text.split())[:_MAX_SNIPPET_CHARS]
+    return f"{prefix}: {snippet}" if snippet else prefix
+
+
+def _parse_error_body(response: httpx.Response) -> dict[str, Any]:
+    """Extract structured fields from an API error body.
+
+    Handles the two envelopes the Khaya API uses::
+
+        {"statusCode": 500, "message": "...", "activityId": "..."}
+        {"error": {"code": "...", "message": "...", "details": [...]}}
+
+    Falls back to a truncated body snippet for non-JSON responses (e.g. the
+    HTML pages emitted by the API gateway when a backend is unavailable).
+    """
+    try:
+        body = response.json()
+    except ValueError:
+        return {"message": _non_json_message(response)}
+
+    if not isinstance(body, dict):
+        return {"message": str(body)}
+
+    parsed: dict[str, Any] = {"activity_id": body.get("activityId")}
+
+    error = body.get("error")
+    if isinstance(error, dict):
+        parsed["message"] = error.get("message") or f"HTTP {response.status_code}"
+        parsed["code"] = error.get("code")
+        details = error.get("details")
+        parsed["details"] = details if isinstance(details, list) else None
+        parsed["activity_id"] = parsed["activity_id"] or error.get("activityId")
+    else:
+        parsed["message"] = body.get("message") or f"HTTP {response.status_code}"
+        parsed["code"] = body.get("code")
+
+    return parsed
+
 
 def _build_http_exception(response: httpx.Response) -> APIError:
     """Map an HTTP error response to the appropriate APIError subclass."""
-    try:
-        message = response.text
-    except Exception:
-        message = f"HTTP {response.status_code}"
-
     status = response.status_code
+    fields = _parse_error_body(response)
+    message = fields.pop("message")
 
     if status == 401:
-        return AuthenticationError(message, status)
+        return AuthenticationError(message, status, **fields)
 
     if status == 429:
         retry_after = response.headers.get("Retry-After")
-        msg = f"{message} (Retry-After: {retry_after}s)" if retry_after else message
-        return RateLimitError(msg, status)
+        if retry_after:
+            message = f"{message} (Retry-After: {retry_after}s)"
+        return RateLimitError(message, status, **fields)
 
-    return APIError(message, status)
+    return APIError(message, status, **fields)
+
+
+def decode_json(response: httpx.Response) -> Any:
+    """Decode a successful response body as JSON.
+
+    Raises:
+        APIError: If the body is not valid JSON. Without this, a 2xx carrying
+            an HTML or truncated body would surface a raw ``JSONDecodeError``,
+            which callers cannot catch via the SDK exception hierarchy.
+    """
+    try:
+        return response.json()
+    except ValueError as e:
+        content_type = response.headers.get("content-type", "unknown")
+        snippet = " ".join(response.text.split())[:_MAX_SNIPPET_CHARS]
+        raise APIError(
+            f"Expected a JSON response but received {content_type!r}: {snippet}",
+            response.status_code,
+        ) from e
+
+
+def _retry_after_delay(response: httpx.Response | None) -> float | None:
+    """Return the capped Retry-After delay, or None if absent/unparseable."""
+    if response is None:
+        return None
+    retry_after = response.headers.get("Retry-After")
+    if not retry_after:
+        return None
+    try:
+        delay = float(retry_after)
+    except (ValueError, TypeError):
+        # Retry-After may also be an HTTP-date; fall back to exponential backoff.
+        return None
+    if delay > MAX_RETRY_AFTER_SECONDS:
+        logger.debug(
+            "Retry-After of %.0fs exceeds cap; using %.0fs",
+            delay,
+            MAX_RETRY_AFTER_SECONDS,
+        )
+        return MAX_RETRY_AFTER_SECONDS
+    return max(delay, 0.0)
 
 
 class BaseApi:
     def __init__(self, config: Settings) -> None:
         self.config = config
-        self.sync_client = httpx.Client(timeout=self.config.timeout)
-        self.async_client = httpx.AsyncClient(timeout=self.config.timeout)
+        # Clients are created on first use so that a purely synchronous caller
+        # never allocates an AsyncClient (and vice versa) — an unused client
+        # would otherwise be left open when the context manager exits.
+        self._sync_client: httpx.Client | None = None
+        self._async_client: httpx.AsyncClient | None = None
+
+    @property
+    def sync_client(self) -> httpx.Client:
+        if self._sync_client is None:
+            self._sync_client = httpx.Client(timeout=self.config.timeout)
+        return self._sync_client
+
+    @property
+    def async_client(self) -> httpx.AsyncClient:
+        if self._async_client is None:
+            self._async_client = httpx.AsyncClient(timeout=self.config.timeout)
+        return self._async_client
 
     # --- Context manager (sync) ---
 
@@ -57,10 +173,15 @@ class BaseApi:
         await self.aclose()
 
     def close(self) -> None:
-        self.sync_client.close()
+        """Close the synchronous client, if one was created."""
+        if self._sync_client is not None:
+            self._sync_client.close()
 
     async def aclose(self) -> None:
-        await self.async_client.aclose()
+        """Close both clients, if they were created."""
+        if self._async_client is not None:
+            await self._async_client.aclose()
+        self.close()
 
     def _prepare_headers(self) -> dict[str, str]:
         return {
@@ -69,36 +190,22 @@ class BaseApi:
             "Cache-Control": "no-cache",
         }
 
-    def _sync_backoff(
-        self, attempt: int, response: httpx.Response | None = None
-    ) -> None:
-        if response is not None:
-            retry_after = response.headers.get("Retry-After")
-            if retry_after:
-                try:
-                    delay = float(retry_after)
-                    logger.debug("Respecting Retry-After header: sleeping %.1fs", delay)
-                    time.sleep(delay)
-                    return
-                except (ValueError, TypeError):
-                    pass
+    def _sync_backoff(self, attempt: int, response: httpx.Response | None = None) -> None:
+        delay = _retry_after_delay(response)
+        if delay is not None:
+            logger.debug("Respecting Retry-After header: sleeping %.1fs", delay)
+            time.sleep(delay)
+            return
         delay = (2**attempt) + random.uniform(0, 1)
         logger.debug("Backing off %.1fs before next attempt", delay)
         time.sleep(delay)
 
-    async def _async_backoff(
-        self, attempt: int, response: httpx.Response | None = None
-    ) -> None:
-        if response is not None:
-            retry_after = response.headers.get("Retry-After")
-            if retry_after:
-                try:
-                    delay = float(retry_after)
-                    logger.debug("Respecting Retry-After header: sleeping %.1fs", delay)
-                    await asyncio.sleep(delay)
-                    return
-                except (ValueError, TypeError):
-                    pass
+    async def _async_backoff(self, attempt: int, response: httpx.Response | None = None) -> None:
+        delay = _retry_after_delay(response)
+        if delay is not None:
+            logger.debug("Respecting Retry-After header: sleeping %.1fs", delay)
+            await asyncio.sleep(delay)
+            return
         delay = (2**attempt) + random.uniform(0, 1)
         logger.debug("Backing off %.1fs before next attempt", delay)
         await asyncio.sleep(delay)
@@ -126,19 +233,18 @@ class BaseApi:
 
         for attempt in range(total):
             try:
-                logger.debug(
-                    "HTTP %s %s (attempt %d/%d)", method, url, attempt + 1, total
-                )
+                logger.debug("HTTP %s %s (attempt %d/%d)", method, url, attempt + 1, total)
                 response = self.sync_client.request(method, url, **kwargs)
 
-                if (
-                    response.status_code in _RETRYABLE_STATUS_CODES
-                    and attempt < total - 1
-                ):
+                if response.status_code in _RETRYABLE_STATUS_CODES and attempt < total - 1:
                     last_exc = _build_http_exception(response)
                     logger.warning(
                         "Received %d from %s %s — retrying (attempt %d/%d)",
-                        response.status_code, method, url, attempt + 1, total,
+                        response.status_code,
+                        method,
+                        url,
+                        attempt + 1,
+                        total,
                     )
                     self._sync_backoff(attempt, response)
                     continue
@@ -146,9 +252,7 @@ class BaseApi:
                 if response.is_error:
                     raise _build_http_exception(response)
 
-                logger.debug(
-                    "Response %d: %s %s", response.status_code, method, url
-                )
+                logger.debug("Response %d: %s %s", response.status_code, method, url)
                 return response
 
             except APIError:
@@ -157,13 +261,15 @@ class BaseApi:
                 if attempt < total - 1:
                     logger.warning(
                         "Transport error on %s %s: %s — retrying (attempt %d/%d)",
-                        method, url, e, attempt + 1, total,
+                        method,
+                        url,
+                        e,
+                        attempt + 1,
+                        total,
                     )
                     self._sync_backoff(attempt)
                     continue
-                logger.warning(
-                    "Transport error on final attempt: %s %s — %s", method, url, e
-                )
+                logger.warning("Transport error on final attempt: %s %s — %s", method, url, e)
                 raise APIError(f"Transport error: {e}", 0) from e
 
         if last_exc is not None:  # pragma: no cover
@@ -193,19 +299,18 @@ class BaseApi:
 
         for attempt in range(total):
             try:
-                logger.debug(
-                    "HTTP %s %s (attempt %d/%d)", method, url, attempt + 1, total
-                )
+                logger.debug("HTTP %s %s (attempt %d/%d)", method, url, attempt + 1, total)
                 response = await self.async_client.request(method, url, **kwargs)
 
-                if (
-                    response.status_code in _RETRYABLE_STATUS_CODES
-                    and attempt < total - 1
-                ):
+                if response.status_code in _RETRYABLE_STATUS_CODES and attempt < total - 1:
                     last_exc = _build_http_exception(response)
                     logger.warning(
                         "Received %d from %s %s — retrying (attempt %d/%d)",
-                        response.status_code, method, url, attempt + 1, total,
+                        response.status_code,
+                        method,
+                        url,
+                        attempt + 1,
+                        total,
                     )
                     await self._async_backoff(attempt, response)
                     continue
@@ -213,9 +318,7 @@ class BaseApi:
                 if response.is_error:
                     raise _build_http_exception(response)
 
-                logger.debug(
-                    "Response %d: %s %s", response.status_code, method, url
-                )
+                logger.debug("Response %d: %s %s", response.status_code, method, url)
                 return response
 
             except APIError:
@@ -224,13 +327,15 @@ class BaseApi:
                 if attempt < total - 1:
                     logger.warning(
                         "Transport error on %s %s: %s — retrying (attempt %d/%d)",
-                        method, url, e, attempt + 1, total,
+                        method,
+                        url,
+                        e,
+                        attempt + 1,
+                        total,
                     )
                     await self._async_backoff(attempt)
                     continue
-                logger.warning(
-                    "Transport error on final attempt: %s %s — %s", method, url, e
-                )
+                logger.warning("Transport error on final attempt: %s %s — %s", method, url, e)
                 raise APIError(f"Transport error: {e}", 0) from e
 
         if last_exc is not None:  # pragma: no cover

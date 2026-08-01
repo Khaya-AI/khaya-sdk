@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 
+- `APIError.code`, `APIError.details`, and `APIError.activity_id` — the API's structured error envelope is now parsed instead of discarded. `activity_id` is the server-side correlation ID to quote in support requests.
+- Non-JSON success bodies (e.g. an HTML page from the gateway on a 200) now raise `APIError` instead of leaking a raw `json.JSONDecodeError`.
+- HTML error pages are summarised by their `<title>` rather than embedding kilobytes of markup in the exception message.
+
+### Changed
+
+- **Removed client-side language validation.** The SDK no longer emits a `UserWarning` for language codes absent from its constants. The API accepts multiple spellings per language (`en-tw`, `en-twi` and `eng-twi` all work) and gains languages independently of SDK releases, so the check produced false warnings on valid calls. `SUPPORTED_*` constants remain as reference data. Unsupported codes are reported by the API as an `APIError` with `code="VALIDATION_FAILED"`.
+- `Retry-After` delays are capped at 60s (`MAX_RETRY_AFTER_SECONDS`). Previously a server sending `Retry-After: 86400` would block the caller for 24 hours per attempt.
+- HTTP clients are created lazily. A purely synchronous caller no longer allocates — and leak — an unused `AsyncClient`, and vice versa; `aclose()` now closes both.
+- `Settings.retry_attempts` must be `>= 1` and `Settings.timeout` must be `> 0`. `retry_attempts=0` previously skipped the request entirely and then raised "Request failed after retries".
+
+### Fixed
+
+- `KhayaClient` docstring no longer claims the API key can be supplied via the `KHAYA_API_KEY` environment variable — the constructor requires it explicitly.
+- Corrected provenance comments in `constants.py`: the cited `/asr/v1/languages` and `/tts/v1/languages` endpoints return 404 and 403 respectively, so those lists are unverified.
+
 - Typed result objects: `TranslationResult`, `TranscriptionResult`, `SynthesisResult` — methods no longer return raw `httpx.Response`.
 - `SynthesisResult.save(path)` helper for writing audio bytes to a file.
 - `TranslationResult.source_language` and `TranslationResult.target_language` attributes.
