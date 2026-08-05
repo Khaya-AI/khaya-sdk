@@ -30,17 +30,20 @@ from khaya import KhayaClient
 with KhayaClient(os.environ["KHAYA_API_KEY"]) as khaya:
     # Translate text from English to Twi
     result = khaya.translate("Hello, how are you?", "en-tw")
-    print(result.json())
+    print(result.text)
 
     # Transcribe a Twi audio file
     result = khaya.transcribe("path/to/audio.wav", "tw")
-    print(result.json())
+    print(result.text)
 
     # Synthesize speech in Twi
-    result = khaya.synthesize("Me ho yɛ", "tw")
-    with open("output.mp3", "wb") as f:
-        f.write(result.content)
+    result = khaya.synthesize("Me ho yɛ", "twi")
+    result.save("output.wav")
 ```
+
+Each method returns a typed result object rather than a raw HTTP response:
+`TranslationResult` and `TranscriptionResult` expose `.text`, and
+`SynthesisResult` exposes `.audio` bytes plus a `.save(path)` helper.
 
 ## Async Usage
 
@@ -52,14 +55,13 @@ from khaya import KhayaClient
 async def main():
     async with KhayaClient(os.environ["KHAYA_API_KEY"]) as khaya:
         result = await khaya.atranslate("Hello", "en-tw")
-        print(result.json())
+        print(result.text)
 
         result = await khaya.atranscribe("path/to/audio.wav", "tw")
-        print(result.json())
+        print(result.text)
 
-        result = await khaya.asynthesize("Me ho yɛ", "tw")
-        with open("output.mp3", "wb") as f:
-            f.write(result.content)
+        result = await khaya.asynthesize("Me ho yɛ", "twi")
+        result.save("output.wav")
 
 asyncio.run(main())
 ```
@@ -81,7 +83,7 @@ khaya = KhayaClient(api_key="your-key")
 
 try:
     result = khaya.translate("Hello", "en-tw")
-    print(result.json())
+    print(result.text)
 except AuthenticationError:
     print("Invalid API key. Check your KHAYA_API_KEY.")
 except RateLimitError as e:
