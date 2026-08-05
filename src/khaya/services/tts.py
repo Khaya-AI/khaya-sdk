@@ -2,11 +2,10 @@ import logging
 
 import httpx
 
-from khaya.constants import SUPPORTED_TTS_LANGUAGES, SUPPORTED_TTS_SPEAKERS
 from khaya.exceptions import TTSGenerationError
 from khaya.models import SynthesisResult
 from khaya.services.base_api import BaseApi
-from khaya.utils import check_authentication, warn_if_unknown
+from khaya.utils import check_authentication
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +41,6 @@ class TtsService:
         """
         if not text or not language:
             raise TTSGenerationError("Text and language are required", 400)
-        warn_if_unknown(language, SUPPORTED_TTS_LANGUAGES, "TTS language")
-        if speaker is not None:
-            warn_if_unknown(speaker, SUPPORTED_TTS_SPEAKERS, "TTS speaker")
         logger.debug(
             "Synthesizing %d chars (language=%s, speaker=%s)",
             len(text),
@@ -54,9 +50,7 @@ class TtsService:
         payload: dict = {"text": text, "language": language}
         if speaker is not None:
             payload["speaker"] = speaker
-        response: httpx.Response = self.http_client.request(
-            "POST", self.endpoint, json=payload
-        )
+        response: httpx.Response = self.http_client.request("POST", self.endpoint, json=payload)
         result = SynthesisResult(audio=response.content, language=language)
         logger.debug(
             "Synthesis complete: %d audio bytes (language=%s)",
@@ -75,9 +69,6 @@ class TtsService:
         """Async version of synthesize."""
         if not text or not language:
             raise TTSGenerationError("Text and language are required", 400)
-        warn_if_unknown(language, SUPPORTED_TTS_LANGUAGES, "TTS language")
-        if speaker is not None:
-            warn_if_unknown(speaker, SUPPORTED_TTS_SPEAKERS, "TTS speaker")
         logger.debug(
             "Synthesizing %d chars (language=%s, speaker=%s)",
             len(text),

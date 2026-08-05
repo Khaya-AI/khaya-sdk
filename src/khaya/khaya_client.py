@@ -1,4 +1,3 @@
-
 from khaya.config import Settings
 from khaya.models import SynthesisResult, TranscriptionResult, TranslationResult
 from khaya.services.asr import AsrService
@@ -14,8 +13,9 @@ class KhayaClient:
     text-to-speech (TTS) for African languages.
 
     Args:
-        api_key: Your Khaya API key. Can also be set via the
-            ``KHAYA_API_KEY`` environment variable.
+        api_key: Your Khaya API key. Required — read it from the
+            ``KHAYA_API_KEY`` environment variable yourself if you keep it
+            there (see the example below).
         config: Optional pre-built Settings instance. When provided,
             ``api_key`` is ignored.
 
@@ -64,9 +64,7 @@ class KhayaClient:
 
     # --- Sync API ---
 
-    def translate(
-        self, text: str, language_pair: str = "en-tw"
-    ) -> TranslationResult:
+    def translate(self, text: str, language_pair: str = "en-tw") -> TranslationResult:
         """Translate text from one language to another.
 
         Args:
@@ -78,9 +76,7 @@ class KhayaClient:
         """
         return self.translation.translate(text, language_pair)
 
-    def transcribe(
-        self, audio_file_path: str, language: str = "tw"
-    ) -> TranscriptionResult:
+    def transcribe(self, audio_file_path: str, language: str = "tw") -> TranscriptionResult:
         """Transcribe an audio file to text.
 
         Args:
@@ -113,15 +109,11 @@ class KhayaClient:
 
     # --- Async API ---
 
-    async def atranslate(
-        self, text: str, language_pair: str = "en-tw"
-    ) -> TranslationResult:
+    async def atranslate(self, text: str, language_pair: str = "en-tw") -> TranslationResult:
         """Async version of :meth:`translate`."""
         return await self.translation.atranslate(text, language_pair)
 
-    async def atranscribe(
-        self, audio_file_path: str, language: str = "tw"
-    ) -> TranscriptionResult:
+    async def atranscribe(self, audio_file_path: str, language: str = "tw") -> TranscriptionResult:
         """Async version of :meth:`transcribe`."""
         return await self.asr.atranscribe(audio_file_path, language)
 

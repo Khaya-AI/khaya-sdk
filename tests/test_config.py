@@ -42,6 +42,18 @@ def test_custom_timeout_and_retries():
     assert config.retry_attempts == 5
 
 
+def test_zero_retry_attempts_rejected():
+    # retry_attempts=0 used to skip the request entirely and then raise
+    # "Request failed after retries" — describing retries that never ran.
+    with pytest.raises(ValidationError):
+        Settings(api_key="key", retry_attempts=0)
+
+
+def test_non_positive_timeout_rejected():
+    with pytest.raises(ValidationError):
+        Settings(api_key="key", timeout=0)
+
+
 def test_config_from_env_file(tmp_path, monkeypatch):
     monkeypatch.delenv("KHAYA_API_KEY", raising=False)
 

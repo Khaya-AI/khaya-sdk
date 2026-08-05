@@ -14,12 +14,34 @@ Exception
     └── ASRTranscriptionError # bad input or missing file for transcribe()
 ```
 
-All exceptions expose two attributes:
+All exceptions expose these attributes:
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
 | `message` | `str` | Human-readable error description |
 | `status_code` | `int` | HTTP status code (0 for transport errors) |
+| `code` | `str \| None` | Machine-readable API error code, e.g. `"VALIDATION_FAILED"` |
+| `details` | `list[dict]` | Per-field details, each with `code`, `message`, and `target` |
+| `activity_id` | `str \| None` | Server-side correlation ID — quote this when reporting a problem |
+
+`str(exc)` combines all of them; `exc.message` stays the bare API message.
+
+### Using the structured fields
+
+```python
+from khaya.exceptions import APIError
+
+try:
+    khaya.translate("Hello", "en-zz")
+except APIError as e:
+    if e.code == "VALIDATION_FAILED":
+        for detail in e.details:
+            print(f"{detail['target']}: {detail['message']}")
+        # language_pair: Language combination en-zz cannot be used
+    elif e.activity_id:
+        # Server-side failure — include this ID in a support request
+        print(f"Khaya failure, activityId={e.activity_id}")
+```
 
 ## Catching errors
 
