@@ -1,0 +1,111 @@
+name: Live smoke tests
+
+# Unit tests mock every HTTP call, so they stay green while the API behind
+# the SDK is failing. This job exercises the real endpoints on a schedule and
+# opens an issue when they break, instead of waiting for a user to report it.
+
+on:
+  schedule:
+    # 06:00 UTC daily.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Live API smoke tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --frozen --extra test --extra dev
+
+      - name: Warn if the API key secret is missing
+        env:
+          KHAYA_API_KEY: ${{ secrets.KHAYA_API_KEY }}
+        run: |
+          # The `secrets` context is not available in a job-level `if`, so the
+          # check lives here rather than in a step condition.
+          if [ -z "$KHAYA_API_KEY" ]; then
+            echo "::warning::KHAYA_API_KEY secret is not set — every integration test will skip and this job will pass vacuously."
+          fi
+
+      - name: Run integration tests against the live API
+        id: smoke
+        env:
+          KHAYA_API_KEY: ${{ secrets.KHAYA_API_KEY }}
+        run: |
+          set -o pipefail
+          uv run pytest -m integration --no-cov -q --tb=short \
+            | tee smoke-output.txt
+
+      - name: Summarise results
+        if: always()
+        run: |
+          {
+            echo "### Live smoke test results"
+            echo
+            echo '```'
+            tail -40 smoke-output.txt 2>/dev/null || echo "no output captured"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Report via the gh CLI rather than a third-party action: this job holds
+      # issues: write, and an unpinned marketplace action would be an
+      # unnecessary supply-chain surface for what is three API calls.
+      - name: Open or update the failure issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          TITLE="Live smoke tests failing"
+          BODY=$(
+            printf '%s\n\n' "The scheduled smoke tests against the live Khaya API failed."
+            printf '%s\n\n' "Run: $RUN_URL"
+            printf '%s\n' '```'
+            tail -40 smoke-output.txt 2>/dev/null || echo "no output captured"
+            printf '%s\n' '```'
+          )
+
+          EXISTING=$(gh issue list --state open --label smoke-failure \
+            --search "$TITLE in:title" --json number --jq '.[0].number // empty')
+
+          if [ -n "$EXISTING" ]; then
+            echo "Commenting on existing issue #$EXISTING"
+            gh issue comment "$EXISTING" --body "$BODY"
+          else
+            echo "Opening a new issue"
+            gh label create smoke-failure --color B60205 \
+              --description "Scheduled live API smoke test failure" 2>/dev/null || true
+            gh issue create --title "$TITLE" --label smoke-failure --body "$BODY"
+          fi
+
+      - name: Close the failure issue once smoke tests pass again
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          EXISTING=$(gh issue list --state open --label smoke-failure \
+            --search "Live smoke tests failing in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            gh issue close "$EXISTING" \
+              --comment "Live smoke tests are passing again; closing automatically."
+          fi
