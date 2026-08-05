@@ -1,6 +1,6 @@
 [project]
 name = "khaya"
-version = "0.1.1"
+version = "0.2.0"
 description = "Python SDK for the Khaya AI API — translation, ASR, and TTS for African languages"
 authors = [
     {name = "Khaya AI Team", email = "info@khaya.ai"},
@@ -58,6 +58,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/khaya"]
+
+[tool.hatch.build.targets.sdist]
+# Local agent config — not part of the source distribution.
+exclude = ["/.claude"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
