@@ -1,0 +1,24 @@
+version: 2
+
+updates:
+  # Python dependencies declared in pyproject.toml / uv.lock.
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+    groups:
+      # One PR for routine dev-tooling bumps rather than one per tool.
+      dev-tooling:
+        patterns: ["ruff", "mypy", "pytest*", "respx", "twine"]
+
+  # Workflow actions. This repo publishes to PyPI, so a compromised action
+  # tag is a supply-chain risk worth tracking.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels: ["dependencies", "ci"]
