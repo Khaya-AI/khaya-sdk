@@ -2,14 +2,15 @@ name: Release to PyPI
 
 # Two ways in:
 #   * push a `vX.Y.Z` tag  — validates the tag against pyproject.toml, tests,
-#     publishes to TestPyPI, then PyPI, then cuts a GitHub release.
-#   * workflow_dispatch    — pick a target; use `testpypi` to rehearse a
-#     release without burning a version number on PyPI.
+#     publishes to PyPI, then cuts a GitHub release.
+#   * workflow_dispatch    — pick a target; `testpypi` rehearses a release
+#     without burning a version number on PyPI.
 #
 # Authentication is OIDC via PyPI Trusted Publishers, so no API token secret
-# exists to leak. This requires a one-time publisher registration on both
-# pypi.org and test.pypi.org naming this repository, workflow file, and the
-# `pypi` / `testpypi` environments below.
+# exists to leak. This requires a one-time publisher registration on pypi.org
+# naming this repository, `release.yml`, and the `pypi` environment below.
+# TestPyPI needs the same registration against `testpypi`, but only if you
+# intend to use the rehearsal path — the tag path never touches it.
 
 on:
   push:
@@ -126,12 +127,12 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # Rehearsal only, never on the tag path: a TestPyPI outage or a lost login
+  # should not be able to block a real release.
   publish-testpypi:
     name: Publish to TestPyPI
     needs: build
-    if: |
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi')
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'
     runs-on: ubuntu-latest
     environment:
       name: testpypi
@@ -155,16 +156,10 @@ jobs:
 
   publish-pypi:
     name: Publish to PyPI
-    needs: [build, publish-testpypi]
-    # On `workflow_dispatch` with target=pypi, `publish-testpypi` is skipped —
-    # without `always()` this job would be skipped along with it.
+    needs: build
     if: |
-      always() &&
-      needs.build.result == 'success' &&
-      (needs.publish-testpypi.result == 'success' ||
-       needs.publish-testpypi.result == 'skipped') &&
-      (github.event_name == 'push' ||
-       (github.event_name == 'workflow_dispatch' && inputs.target == 'pypi'))
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.target == 'pypi')
     runs-on: ubuntu-latest
     environment:
       name: pypi
