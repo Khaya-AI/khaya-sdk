@@ -13,9 +13,12 @@ name: Release to PyPI
 
 on:
   push:
+    # A plain glob, not a character-class pattern: pushing v0.2.0 against
+    # `v[0-9]+.[0-9]+.[0-9]+` produced no workflow run at all. Precision here
+    # buys nothing anyway — the `validate` job below rejects any tag that
+    # doesn't match the version in pyproject.toml.
     tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
-      - "v[0-9]+.[0-9]+.[0-9]+.post[0-9]+"
+      - "v*"
   workflow_dispatch:
     inputs:
       target:
