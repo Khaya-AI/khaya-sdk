@@ -55,6 +55,10 @@ markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.inlinehilite
+  # Lets docs/changelog.md include the root CHANGELOG.md instead of copying it.
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
   - pymdownx.tabbed:
       alternate_style: true
   - attr_list
