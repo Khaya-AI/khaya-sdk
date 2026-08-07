@@ -79,6 +79,7 @@ nav:
       - Async Usage: guides/async.md
       - Configuration: guides/configuration.md
       - Logging: guides/logging.md
+      - MCP Server: guides/mcp.md
   - Internals: internals.md
   - API Reference:
       - KhayaClient: api-reference/client.md

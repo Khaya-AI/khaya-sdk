@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **MCP server** — `pip install khaya[mcp]` provides a `khaya-mcp` console
+  script that exposes translation, ASR and TTS as tools to Claude Desktop,
+  Claude Code, Cursor and other MCP clients. Four tools: `translate`,
+  `transcribe`, `synthesize`, and `list_languages`, the last so a model looks
+  a code up rather than guessing between `tw`, `twi` and `eng-twi`. The `mcp`
+  dependency lives behind the extra; a plain install is unaffected.
+
 - **ASR now calls API v3.** Same latency as v1 (measured 0.65s on a 1.2s clip,
   3.1s on a 22.8s clip) but a structured response the SDK can read.
 - `TranscriptionResult.warnings` — advisories from the API, such as the notice
