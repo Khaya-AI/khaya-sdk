@@ -138,11 +138,18 @@ See the [Logging guide](guides/logging.md) for how to enable and configure SDK l
 The Khaya API versions each service independently. The SDK currently calls v1
 of all three:
 
-| Service | SDK calls | Also available |
-|---------|-----------|----------------|
-| Translation | `/v1/translate` | `/v2/translate` — same response shape |
-| ASR | `/asr/v3/transcribe` | `/asr/v1/`, `/asr/v2/` — v1 returns a bare string with no warnings or timings |
-| TTS | `/tts/v1/tts` | `/tts/v2/synthesize` |
+`Settings` selects a version per service, resolved through the
+`API_ENDPOINTS` registry in `khaya.config`:
+
+| Service | Versions | Default | Route |
+|---------|----------|---------|-------|
+| Translation | `v1`, `v2` | `v1` | `/v1/translate`, `/v2/translate` |
+| ASR | `v1`, `v2`, `v3` | `v3` | `/asr/{version}/transcribe` |
+| TTS | `v1`, `v2` | `v1` | `/tts/v1/tts`, `/tts/v2/synthesize` |
+
+The registry maps `(service, version)` to a path rather than interpolating the
+version, because TTS renamed its route: `/tts/v2/tts` is a 404. A test asserts
+every selectable version has an entry and that no entry is unreachable.
 
 ASR moved to v3 because it is the only version change that earns itself:
 same latency as v1 (measured at 0.65s on a 1.2s clip and 3.1s on a 22.8s

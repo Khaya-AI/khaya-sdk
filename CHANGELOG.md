@@ -15,7 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `transcribe`, `synthesize`, and `list_languages`, the last so a model looks
   a code up rather than guessing between `tw`, `twi` and `eng-twi`. The `mcp`
   dependency lives behind the extra; a plain install is unaffected.
-
+- `Settings.translation_version` and `Settings.tts_version` alongside
+  `asr_version`, so every service's API version is selectable. Defaults are
+  `v1`, `v3`, `v1` — the versions measured as best. Also readable from
+  `KHAYA_TRANSLATION_VERSION`, `KHAYA_ASR_VERSION` and `KHAYA_TTS_VERSION`.
+- `khaya.config.API_ENDPOINTS` maps `(service, version)` to a path. TTS
+  renamed its route between versions — `/tts/v2/tts` is a 404 while
+  `/tts/v2/synthesize` works — so a version is not a substitutable string.
+  Previously translation and TTS had their versions welded into an f-string
+  and could not be changed at all. Integration tests exercise all seven
+  version combinations against the live API.
 - **ASR now calls API v3.** Same latency as v1 (measured 0.65s on a 1.2s clip,
   3.1s on a 22.8s clip) but a structured response the SDK can read.
 - `TranscriptionResult.warnings` — advisories from the API, such as the notice

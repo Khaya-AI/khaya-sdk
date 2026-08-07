@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from khaya import KhayaClient
+from khaya.config import Settings
 from khaya.constants import (
     SUPPORTED_ASR_LANGUAGES,
     SUPPORTED_TTS_LANGUAGES,
@@ -153,6 +154,36 @@ def test_unknown_speaker_is_rejected_client_side(integration_client):
     """The API accepts any speaker string; this asserts the SDK does not."""
     with pytest.raises(TTSGenerationError, match="Unknown speaker"):
         integration_client.synthesize("Me ho yɛ", "twi", speaker="robot")
+
+
+# ---------------------------------------------------------------------------
+# Endpoint registry — proves every selectable version is a real route, which
+# unit tests cannot: a wrong path is a 404, not a type error.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("version", ["v1", "v2"])
+def test_every_translation_version_works(version):
+    config = Settings(api_key=os.environ["KHAYA_API_KEY"], translation_version=version)
+    with KhayaClient(config.api_key, config=config) as client:
+        assert client.translate("Good morning", "eng-twi").text.strip()
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("version", ["v1", "v2", "v3"])
+def test_every_asr_version_works(version):
+    config = Settings(api_key=os.environ["KHAYA_API_KEY"], asr_version=version)
+    with KhayaClient(config.api_key, config=config) as client:
+        assert client.transcribe(str(AUDIO_FIXTURE), "twi").text.strip()
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("version", ["v1", "v2"])
+def test_every_tts_version_works(version):
+    config = Settings(api_key=os.environ["KHAYA_API_KEY"], tts_version=version)
+    with KhayaClient(config.api_key, config=config) as client:
+        assert client.synthesize("Me ho yɛ", "twi").audio[:4] == b"RIFF"
 
 
 # ---------------------------------------------------------------------------
