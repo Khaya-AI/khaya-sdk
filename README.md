@@ -112,6 +112,26 @@ except APIError as e:
     print(f"API error ({e.status_code}): {e.message}")
 ```
 
+## Use it from Claude, Cursor, or any MCP client
+
+```bash
+pip install khaya[mcp]
+```
+
+```json
+{
+  "mcpServers": {
+    "khaya": {
+      "command": "khaya-mcp",
+      "env": { "KHAYA_API_KEY": "your_api_key_here" }
+    }
+  }
+}
+```
+
+Your assistant can then translate, transcribe and synthesize African languages
+directly. See the [MCP guide](https://khaya-sdk.readthedocs.io/en/latest/guides/mcp/).
+
 ## Supported languages
 
 | Service | Languages |
