@@ -1,11 +1,26 @@
-# Khaya SDK
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Khaya-AI/khaya-sdk/main/docs/assets/khaya-logo.png" alt="Khaya AI" width="110">
+</p>
 
-[![PyPI version](https://badge.fury.io/py/khaya.svg)](https://pypi.org/project/khaya/)
-[![CI](https://github.com/Khaya-AI/khaya-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/Khaya-AI/khaya-sdk/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Docs](https://img.shields.io/badge/docs-khaya--sdk.readthedocs.io-blue)](https://khaya-sdk.readthedocs.io)
+<h1 align="center">Khaya SDK</h1>
 
-Python SDK for the [Khaya AI](https://khaya.ai) Khaya API — providing translation, automatic speech recognition (ASR), and text-to-speech (TTS) for African languages.
+<p align="center">
+  Translation, speech recognition, and text-to-speech for African languages.
+</p>
+
+<p align="center">
+  <a href="https://pypi.org/project/khaya/"><img src="https://img.shields.io/pypi/v/khaya" alt="PyPI"></a>
+  <a href="https://pypi.org/project/khaya/"><img src="https://img.shields.io/pypi/pyversions/khaya" alt="Python versions"></a>
+  <a href="https://github.com/Khaya-AI/khaya-sdk/actions/workflows/ci.yml"><img src="https://github.com/Khaya-AI/khaya-sdk/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://khaya-sdk.readthedocs.io"><img src="https://img.shields.io/badge/docs-readthedocs-blue" alt="Docs"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/pypi/l/khaya" alt="License"></a>
+</p>
+
+Python SDK for the [Khaya AI](https://khaya.ai) API — translation, automatic
+speech recognition (ASR), and text-to-speech (TTS) across 30+ African
+languages, with sync and async clients, typed results, and automatic retries.
+
+**[Documentation](https://khaya-sdk.readthedocs.io)** · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
 
 ## Installation
 
@@ -94,9 +109,18 @@ except APIError as e:
     print(f"API error ({e.status_code}): {e.message}")
 ```
 
-## Supported Languages
+## Supported languages
 
-### Translation pairs
+The API is the authority on what it accepts; these lists are reference data,
+generated from its live catalogues. Full tables in the
+[documentation](https://khaya-sdk.readthedocs.io).
+
+Translation takes a `"<source>-<target>"` pair such as `"en-tw"`, bidirectional
+with English as the pivot. ASR and TTS take a single language code, and the
+two use different codes for some languages.
+
+<details>
+<summary><strong>Translation pairs</strong> — 12 languages, paired with English</summary>
 
 | Code | Language |
 |------|----------|
@@ -113,9 +137,10 @@ except APIError as e:
 | `mer` | Kimeru |
 | `kus` | Kusaal |
 
-Language pair format: `"<source>-<target>"`, e.g. `"en-tw"` or `"tw-en"`. All pairs are bidirectional with English as the pivot language.
+</details>
 
-### ASR languages
+<details>
+<summary><strong>ASR languages</strong> — 34 languages</summary>
 
 | Code | Language |
 |------|----------|
@@ -153,7 +178,11 @@ Language pair format: `"<source>-<target>"`, e.g. `"en-tw"` or `"tw-en"`. All pa
 | `wlx` | Wali |
 | `wol` | Wolof |
 | `yor` | Yoruba |
-### TTS languages
+
+</details>
+
+<details>
+<summary><strong>TTS languages</strong> — 32 languages</summary>
 
 | Code | Language |
 |------|----------|
@@ -189,6 +218,9 @@ Language pair format: `"<source>-<target>"`, e.g. `"en-tw"` or `"tw-en"`. All pa
 | `wlx` | Wali |
 | `wol` | Wolof |
 | `yor` | Yoruba |
+
+</details>
+
 ## Configuration
 
 ```python

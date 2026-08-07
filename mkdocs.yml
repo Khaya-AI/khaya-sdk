@@ -7,6 +7,8 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
+  logo: assets/khaya-logo.png
+  favicon: assets/khaya-logo.png
   palette:
     - scheme: default
       primary: black
