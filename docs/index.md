@@ -20,7 +20,7 @@ from khaya import KhayaClient
 
 with KhayaClient(os.environ["KHAYA_API_KEY"]) as khaya:
     result = khaya.translate("Hello, how are you?", "en-tw")
-    print(result.text)  # "Ɛte sɛn?"
+    print(result.text)  # the Twi translation
 ```
 
 Ready to go further? Head to the [Getting Started](getting-started.md) guide.

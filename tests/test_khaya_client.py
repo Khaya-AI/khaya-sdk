@@ -5,6 +5,7 @@ is required. Integration tests live in test_integration.py.
 """
 
 import asyncio
+import json
 import warnings
 
 import httpx
@@ -26,6 +27,10 @@ BASE_URL = "https://translation-api.ghananlp.org"
 TRANSLATE_URL = f"{BASE_URL}/v1/translate"
 TTS_URL = f"{BASE_URL}/tts/v1/tts"
 ASR_URL = f"{BASE_URL}/asr/v1/transcribe"
+
+# TTS responses must look like audio or the content-type guard rejects them.
+WAV_BYTES = b"RIFF$\x00\x00\x00WAVEfmt " + b"\x00" * 24
+AUDIO_HEADERS = {"content-type": "audio/wav"}
 
 
 def make_client(api_key: str = "test-api-key", retry_attempts: int = 1) -> KhayaClient:
@@ -133,7 +138,7 @@ class TestTranscribe:
 class TestSynthesize:
     def test_success(self, respx_mock):
         respx_mock.post(TTS_URL).mock(
-            return_value=httpx.Response(200, content=b"\xff\xfb audio bytes")
+            return_value=httpx.Response(200, content=WAV_BYTES, headers=AUDIO_HEADERS)
         )
         result = make_client().synthesize("Hello", "tw")
         assert isinstance(result, SynthesisResult)
@@ -142,12 +147,55 @@ class TestSynthesize:
 
     def test_save_writes_file(self, respx_mock, tmp_path):
         respx_mock.post(TTS_URL).mock(
-            return_value=httpx.Response(200, content=b"\xff\xfb audio bytes")
+            return_value=httpx.Response(200, content=WAV_BYTES, headers=AUDIO_HEADERS)
         )
         result = make_client().synthesize("Hello", "tw")
         out = tmp_path / "output.wav"
         result.save(str(out))
-        assert out.read_bytes() == b"\xff\xfb audio bytes"
+        assert out.read_bytes() == WAV_BYTES
+
+    def test_speaker_is_sent_in_payload(self, respx_mock):
+        route = respx_mock.post(TTS_URL).mock(
+            return_value=httpx.Response(200, content=WAV_BYTES, headers=AUDIO_HEADERS)
+        )
+        make_client().synthesize("Hello", "twi", speaker="female")
+        assert json.loads(route.calls.last.request.content)["speaker"] == "female"
+
+    def test_speaker_omitted_from_payload_when_none(self, respx_mock):
+        route = respx_mock.post(TTS_URL).mock(
+            return_value=httpx.Response(200, content=WAV_BYTES, headers=AUDIO_HEADERS)
+        )
+        make_client().synthesize("Hello", "twi")
+        assert "speaker" not in json.loads(route.calls.last.request.content)
+
+    @pytest.mark.parametrize("speaker", ["male_low", "male_high", "female"])
+    def test_every_supported_speaker_is_accepted(self, respx_mock, speaker):
+        respx_mock.post(TTS_URL).mock(
+            return_value=httpx.Response(200, content=WAV_BYTES, headers=AUDIO_HEADERS)
+        )
+        assert make_client().synthesize("Hello", "twi", speaker=speaker).audio == WAV_BYTES
+
+    def test_unknown_speaker_raises_before_any_request(self, respx_mock):
+        route = respx_mock.post(TTS_URL)
+        with pytest.raises(TTSGenerationError, match="Unknown speaker"):
+            make_client().synthesize("Hello", "twi", speaker="robot")
+        # Must not burn a request.
+        assert route.call_count == 0
+
+    def test_non_audio_200_raises_rather_than_returning_html(self, respx_mock):
+        respx_mock.post(TTS_URL).mock(
+            return_value=httpx.Response(
+                200,
+                content=b"<html><head><title>503 Service Unavailable</title></head></html>",
+                headers={"content-type": "text/html"},
+            )
+        )
+        with pytest.raises(TTSGenerationError, match="Expected audio"):
+            make_client().synthesize("Hello", "twi")
+
+    def test_audio_without_content_type_is_accepted_on_riff_magic(self, respx_mock):
+        respx_mock.post(TTS_URL).mock(return_value=httpx.Response(200, content=WAV_BYTES))
+        assert make_client().synthesize("Hello", "twi").audio == WAV_BYTES
 
     def test_empty_text_raises_tts_error(self):
         with pytest.raises(TTSGenerationError):
@@ -299,7 +347,7 @@ class TestAsync:
 
     async def test_asynthesize_success(self, respx_mock):
         respx_mock.post(TTS_URL).mock(
-            return_value=httpx.Response(200, content=b"\xff\xfb audio bytes")
+            return_value=httpx.Response(200, content=WAV_BYTES, headers=AUDIO_HEADERS)
         )
         result = await make_client().asynthesize("Hello", "tw")
         assert isinstance(result, SynthesisResult)
@@ -654,7 +702,9 @@ class TestNoClientSideLanguageValidation:
             make_client().transcribe(str(audio), "xx")
 
     def test_no_warning_for_unlisted_tts_language(self, respx_mock):
-        respx_mock.post(TTS_URL).mock(return_value=httpx.Response(200, content=b"audio"))
+        respx_mock.post(TTS_URL).mock(
+            return_value=httpx.Response(200, content=WAV_BYTES, headers=AUDIO_HEADERS)
+        )
         with warnings.catch_warnings():
             warnings.simplefilter("error")
             make_client().synthesize("Hello", "xx")

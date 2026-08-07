@@ -110,11 +110,11 @@ class KhayaClient:
     # --- Async API ---
 
     async def atranslate(self, text: str, language_pair: str = "en-tw") -> TranslationResult:
-        """Async version of :meth:`translate`."""
+        """Async version of `translate()`."""
         return await self.translation.atranslate(text, language_pair)
 
     async def atranscribe(self, audio_file_path: str, language: str = "tw") -> TranscriptionResult:
-        """Async version of :meth:`transcribe`."""
+        """Async version of `transcribe()`."""
         return await self.asr.atranscribe(audio_file_path, language)
 
     async def asynthesize(
@@ -123,5 +123,5 @@ class KhayaClient:
         language: str,
         speaker: str | None = None,
     ) -> SynthesisResult:
-        """Async version of :meth:`synthesize`."""
+        """Async version of `synthesize()`."""
         return await self.tts.asynthesize(text, language, speaker)

@@ -1,16 +1,10 @@
 """Integration tests — require a real KHAYA_API_KEY and network access.
 
-Run with:
-    pytest -m integration
+Run with ``pytest -m integration``. Deselected in normal CI; run on a
+schedule by .github/workflows/smoke.yml.
 
-Deselected in the normal CI run; executed on a schedule by
-.github/workflows/smoke.yml so that backend outages and response-shape
-changes are noticed without waiting for a user to report them.
-
-These assert the SDK's public contract against the live API. They are
-deliberately loose about *content* (translations and transcriptions are model
-outputs and will drift) and strict about *shape* — the types, attributes, and
-exceptions the SDK promises.
+Loose about content (model output drifts), strict about shape — the types,
+attributes, and exceptions the SDK promises.
 """
 
 import os
@@ -19,7 +13,12 @@ from pathlib import Path
 import pytest
 
 from khaya import KhayaClient
-from khaya.exceptions import APIError, AuthenticationError
+from khaya.constants import (
+    SUPPORTED_ASR_LANGUAGES,
+    SUPPORTED_TTS_LANGUAGES,
+    SUPPORTED_TTS_SPEAKERS,
+)
+from khaya.exceptions import APIError, AuthenticationError, TTSGenerationError
 from khaya.models import SynthesisResult, TranscriptionResult, TranslationResult
 
 AUDIO_FIXTURE = Path(__file__).parent / "me_ho_ye.wav"
@@ -51,12 +50,7 @@ def test_translate_en_to_tw(integration_client):
 @pytest.mark.integration
 @pytest.mark.parametrize("pair", ["en-tw", "en-twi", "eng-twi"])
 def test_api_accepts_multiple_code_spellings(integration_client, pair):
-    """The SDK must not second-guess codes the API accepts.
-
-    This is the check that justifies removing client-side language
-    validation; if the API ever narrows what it accepts, this fails and the
-    decision gets revisited.
-    """
+    """Justifies removing client-side validation: fails if the API narrows."""
     result = integration_client.translate("Good morning", pair)
     assert result.text.strip()
 
@@ -111,6 +105,54 @@ def test_synthesized_audio_can_be_saved(integration_client, tmp_path):
     out = tmp_path / "output.wav"
     result.save(str(out))
     assert out.stat().st_size == len(result.audio) > 0
+    # A size assertion alone passes for a saved HTML error page.
+    assert out.read_bytes()[:4] == b"RIFF"
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("speaker", sorted(SUPPORTED_TTS_SPEAKERS))
+def test_every_documented_speaker_synthesizes(integration_client, speaker):
+    result = integration_client.synthesize("Me ho yɛ", "twi", speaker=speaker)
+    assert result.audio[:4] == b"RIFF"
+
+
+@pytest.mark.integration
+def test_unknown_speaker_is_rejected_client_side(integration_client):
+    """The API accepts any speaker string; this asserts the SDK does not."""
+    with pytest.raises(TTSGenerationError, match="Unknown speaker"):
+        integration_client.synthesize("Me ho yɛ", "twi", speaker="robot")
+
+
+# ---------------------------------------------------------------------------
+# Reference data — pinned to the live catalogues so drift fails the smoke run.
+# ---------------------------------------------------------------------------
+
+
+def _catalogue(client, path):
+    response = client.http_client.request("GET", f"{client.config.base_url}{path}")
+    return response.json()["languages"]
+
+
+@pytest.mark.integration
+def test_asr_language_list_matches_the_live_catalogue(integration_client):
+    live = {entry["code"] for entry in _catalogue(integration_client, "/asr/v3/languages")}
+    assert SUPPORTED_ASR_LANGUAGES == live
+
+
+@pytest.mark.integration
+def test_tts_language_list_matches_the_live_catalogue(integration_client):
+    live = set(_catalogue(integration_client, "/tts/v2/languages").values())
+    assert SUPPORTED_TTS_LANGUAGES == live
+
+
+@pytest.mark.integration
+def test_speaker_list_matches_the_live_catalogue(integration_client):
+    # {"speakers": {"Multilingual": [...]}} — grouped by voice family.
+    response = integration_client.http_client.request(
+        "GET", f"{integration_client.config.base_url}/tts/v1/speakers"
+    )
+    live = {s for group in response.json()["speakers"].values() for s in group}
+    assert SUPPORTED_TTS_SPEAKERS == live
 
 
 # ---------------------------------------------------------------------------

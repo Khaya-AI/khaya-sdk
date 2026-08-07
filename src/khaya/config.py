@@ -5,13 +5,27 @@ from khaya.constants import RETRY_ATTEMPTS, TIMEOUT
 
 
 class Settings(BaseSettings):
-    api_key: str | None = Field(default=None, validation_alias="KHAYA_API_KEY")
+    """Runtime configuration for `KhayaClient`.
+
+    Each field also reads a ``KHAYA_``-prefixed environment variable
+    (``KHAYA_API_KEY``, ``KHAYA_BASE_URL``, ...).
+
+    Attributes:
+        api_key: Sent as the ``Ocp-Apim-Subscription-Key`` header.
+        base_url: API root. Must be HTTPS.
+        timeout: Per-request timeout in seconds.
+        retry_attempts: Total attempts per request, including the first.
+    """
+
+    api_key: str | None = Field(default=None)
     base_url: str = "https://translation-api.ghananlp.org"
     timeout: int = Field(default=TIMEOUT, gt=0)
-    # At least one attempt: retry_attempts=0 would skip the request entirely.
+    # retry_attempts=0 would skip the request entirely.
     retry_attempts: int = Field(default=RETRY_ATTEMPTS, ge=1)
 
-    model_config = SettingsConfigDict(env_file=None, extra="forbid", populate_by_name=True)
+    # Prefixed, so a BASE_URL set for an unrelated app cannot redirect the
+    # API key to another host.
+    model_config = SettingsConfigDict(env_file=None, extra="forbid", env_prefix="KHAYA_")
 
     @field_validator("base_url")
     @classmethod
@@ -30,4 +44,6 @@ class Settings(BaseSettings):
 
 
 class DevSettings(Settings):
-    model_config = SettingsConfigDict(env_file=".env", extra="forbid", populate_by_name=True)
+    """`Settings` that also reads a local ``.env`` file."""
+
+    model_config = SettingsConfigDict(env_file=".env", extra="forbid", env_prefix="KHAYA_")

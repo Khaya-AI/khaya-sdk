@@ -1,15 +1,11 @@
 name: Release to PyPI
 
-# Two ways in:
-#   * push a `vX.Y.Z` tag  — validates the tag against pyproject.toml, tests,
-#     publishes to TestPyPI, then PyPI, then cuts a GitHub release.
-#   * workflow_dispatch    — pick a target; use `testpypi` to rehearse a
-#     release without burning a version number on PyPI.
+# Push a `vX.Y.Z` tag to release: validate, test, TestPyPI, PyPI, GitHub
+# release. Or dispatch manually with `testpypi` to rehearse.
 #
-# Authentication is OIDC via PyPI Trusted Publishers, so no API token secret
-# exists to leak. This requires a one-time publisher registration on both
-# pypi.org and test.pypi.org naming this repository, workflow file, and the
-# `pypi` / `testpypi` environments below.
+# Auth is OIDC via PyPI Trusted Publishers — no token secret to leak. Needs a
+# one-time publisher registration on pypi.org and test.pypi.org naming this
+# repo, this file, and the `pypi` / `testpypi` environments below.
 
 on:
   push:
@@ -32,13 +28,14 @@ permissions:
 
 jobs:
   validate:
-    name: Validate version tag
-    if: github.event_name == 'push'
+    name: Validate version
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get_version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Get version from pyproject.toml
         id: get_version
@@ -50,25 +47,29 @@ jobs:
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Verify tag matches package version
+      # A dispatch can target any ref, so PyPI publishes require a matching
+      # tag on the checked-out commit. TestPyPI is a rehearsal and does not.
+      - name: Verify the version is tagged
+        env:
+          VERSION: ${{ steps.get_version.outputs.version }}
+          TARGET: ${{ inputs.target }}
         run: |
-          TAG="${GITHUB_REF_NAME#v}"
-          PKG="${{ steps.get_version.outputs.version }}"
-          if [ "$TAG" != "$PKG" ]; then
-            echo "::error::Tag '${GITHUB_REF_NAME}' does not match pyproject.toml version '${PKG}'"
-            exit 1
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            if [ "${GITHUB_REF_NAME#v}" != "$VERSION" ]; then
+              echo "::error::Tag '${GITHUB_REF_NAME}' does not match pyproject.toml version '${VERSION}'"
+              exit 1
+            fi
+          elif [ "$TARGET" = "pypi" ]; then
+            if ! git tag --points-at HEAD | grep -qx "v${VERSION}"; then
+              echo "::error::HEAD is not tagged v${VERSION}; tag the commit or publish to testpypi instead"
+              exit 1
+            fi
           fi
+          echo "Publishing version ${VERSION}"
 
   test:
     name: Test (Python ${{ matrix.python-version }})
     needs: [validate]
-    # `validate` is skipped on workflow_dispatch (no tag to check), and a
-    # skipped dependency would otherwise skip this job too.
-    if: |
-      always() && (
-        needs.validate.result == 'success' ||
-        needs.validate.result == 'skipped'
-      )
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
@@ -149,15 +150,13 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
-          # A rehearsal upload of this version may already be there; that is
-          # not a reason to block the production publish.
+          # A rehearsal upload must not block the production publish.
           skip-existing: true
 
   publish-pypi:
     name: Publish to PyPI
     needs: [build, publish-testpypi]
-    # On `workflow_dispatch` with target=pypi, `publish-testpypi` is skipped —
-    # without `always()` this job would be skipped along with it.
+    # `publish-testpypi` is skipped on dispatch with target=pypi.
     if: |
       always() &&
       needs.build.result == 'success' &&
@@ -210,9 +209,7 @@ jobs:
             echo "See CHANGELOG.md for details." > release_notes.md
           fi
 
-      # Cut the release with the gh CLI rather than a marketplace action: this
-      # job holds contents: write, and that is not a permission to hand to an
-      # unpinned third-party action for what is a single API call.
+      # gh CLI, not a marketplace action: this job holds contents: write.
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

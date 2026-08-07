@@ -1,18 +1,16 @@
 TIMEOUT = 30
 RETRY_ATTEMPTS = 3
 
-# Reference data only — NOT used to validate user input.
+# Reference data for documentation and pickers — not used to validate input.
+# The API accepts several spellings per language (en-tw, en-twi, eng-twi all
+# mean Twi), so a whitelist rejects valid calls. SUPPORTED_TTS_SPEAKERS is the
+# one exception; see its note below.
 #
-# The API accepts several spellings for the same language (``en-tw``,
-# ``en-twi`` and ``eng-twi`` all translate to Twi), so rejecting or warning on
-# codes absent from these sets produced false positives on valid calls. The
-# API is the authority on what it accepts; these lists exist for documentation
-# and for callers who want to offer a picker.
+# The SDK calls v1 of each service. These lists come from whichever version
+# publishes a catalogue, then checked against v1.
 
-# Translation language pairs (source-target).
-# Verified against the /v1/languages endpoint. Note that endpoint reports
-# three-letter codes (twi, ewe, yor, kik) for several languages listed here
-# with two-letter codes; both forms are accepted by /v1/translate.
+# Translation pairs, source-target. From /v1/languages, which reports
+# three-letter codes; /v1/translate accepts both forms.
 SUPPORTED_LANGUAGE_PAIRS: frozenset[str] = frozenset(
     {
         "en-tw",  # English → Twi
@@ -40,57 +38,58 @@ SUPPORTED_LANGUAGE_PAIRS: frozenset[str] = frozenset(
     }
 )
 
-# Languages supported for ASR.
-# Unverified: /asr/v1/languages returns 404, so this list has no live source
-# and may drift. Treat as indicative, not authoritative.
+# ASR languages, ISO 639-3, from /asr/v3/languages. The v1 endpoint the SDK
+# calls accepts all of them. An earlier revision used legacy spellings, nine
+# of which the API rejects; replacements are marked below.
 SUPPORTED_ASR_LANGUAGES: frozenset[str] = frozenset(
     {
-        "ada",  # Dangme
-        "en_gh",  # African English
+        "eng",  # African English (was en_gh)
+        "fra",  # African French
         "atw",  # Akuapem Twi
-        "tw",  # Asante Twi
+        "bwu",  # Buli
         "dga",  # Dagaare
         "dag",  # Dagbani
-        "ee",  # Ewe
+        "ada",  # Dangme
+        "ewe",  # Ewe
         "fat",  # Fante
-        "fra",  # French
         "gaa",  # Ga
-        "gon",  # Gonja
+        "gjn",  # Gonja (was gon)
         "gur",  # Gurene
-        "ha",  # Hausa
-        "ig",  # Igbo
-        "kas",  # Kasem
-        "ki",  # Kikuyu
-        "kon_k",  # Konkomba (Likoonli)
-        "kon_l",  # Konkomba (Likpakpaanl)
+        "hau",  # Hausa
+        "ibo",  # Igbo
+        "xsm",  # Kasem (was kas)
+        "kik",  # Kikuyu
+        "kin",  # Kinyarwanda
+        "xon_likoonli",  # Konkomba-Likoonli (was kon_k)
+        "xon_likpakpaanl",  # Konkomba-Likpakpaanl (was kon_l)
         "kri",  # Krio
         "kus",  # Kusaal
         "luo",  # Luo
-        "mam",  # Mampruli
+        "maw",  # Mampruli (was mam)
         "men",  # Mende
-        "mer",  # Meru/Kimeru
+        "mer",  # Meru
+        "pcm",  # Naija Pidgin (was pid)
         "nzi",  # Nzema
-        "pid",  # Pidgin
-        "sn",  # Shona
-        "sw",  # Swahili
+        "sna",  # Shona
+        "swa",  # Swahili
         "tem",  # Temne
-        "wal",  # Wali
-        "wo",  # Wolof
-        "yo",  # Yoruba
+        "twi",  # Twi
+        "wlx",  # Wali (was wal)
+        "wol",  # Wolof (was wo)
+        "yor",  # Yoruba
     }
 )
 
-# Languages supported for TTS.
-# Unverified: /tts/v1/languages returns 403, so this list has no live source
-# and may drift. Treat as indicative, not authoritative.
-# Note: TTS language codes differ from ASR codes for the same language.
+# TTS languages, from /tts/v2/languages (/tts/v1/languages returns the same).
+# Some codes differ from ASR: Konkomba is lxn/xon here, xon_* for ASR.
 SUPPORTED_TTS_LANGUAGES: frozenset[str] = frozenset(
     {
-        "ada",  # Dangme
         "atw",  # Akuapem Twi
         "twi",  # Asante Twi
-        "dag",  # Dagbani
         "dga",  # Dagaare
+        "dag",  # Dagbani
+        "ada",  # Dangme
+        "eng",  # English
         "ewe",  # Ewe
         "fat",  # Fante
         "fra",  # French
@@ -101,8 +100,8 @@ SUPPORTED_TTS_LANGUAGES: frozenset[str] = frozenset(
         "ibo",  # Igbo
         "xsm",  # Kasem
         "kik",  # Kikuyu
-        "xon",  # Konkomba (Likpakpaanl)
         "lxn",  # Konkomba (Likoonli)
+        "xon",  # Konkomba (Likpakpaanl)
         "kri",  # Krio
         "kus",  # Kusaal
         "luo",  # Luo
@@ -120,6 +119,7 @@ SUPPORTED_TTS_LANGUAGES: frozenset[str] = frozenset(
     }
 )
 
-# Available TTS speakers.
-# Source: /tts/v1/speakers endpoint.
+# From /tts/v1/speakers. Unlike the language lists this one IS enforced (see
+# khaya.services.tts): the set is closed, and the API silently falls back to
+# its default voice rather than erroring on a typo.
 SUPPORTED_TTS_SPEAKERS: frozenset[str] = frozenset({"male_low", "male_high", "female"})

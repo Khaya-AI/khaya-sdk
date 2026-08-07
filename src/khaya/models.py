@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 @dataclass
 class TranslationResult:
-    """Result returned by :meth:`~khaya.KhayaClient.translate` and :meth:`~khaya.KhayaClient.atranslate`.
+    """Result returned by `KhayaClient.translate()` and `KhayaClient.atranslate()`.
 
     Attributes:
         text: The translated string.
@@ -18,7 +18,7 @@ class TranslationResult:
 
 @dataclass
 class TranscriptionResult:
-    """Result returned by :meth:`~khaya.KhayaClient.transcribe` and :meth:`~khaya.KhayaClient.atranscribe`.
+    """Result returned by `KhayaClient.transcribe()` and `KhayaClient.atranscribe()`.
 
     Attributes:
         text: The transcribed string.
@@ -31,7 +31,7 @@ class TranscriptionResult:
 
 @dataclass
 class SynthesisResult:
-    """Result returned by :meth:`~khaya.KhayaClient.synthesize` and :meth:`~khaya.KhayaClient.asynthesize`.
+    """Result returned by `KhayaClient.synthesize()` and `KhayaClient.asynthesize()`.
 
     Attributes:
         audio: Raw audio bytes.

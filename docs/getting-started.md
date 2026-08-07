@@ -45,7 +45,7 @@ from khaya import KhayaClient
 
 with KhayaClient(os.environ["KHAYA_API_KEY"]) as khaya:
     result = khaya.translate("Good morning", "en-tw")
-    print(result.text)  # "Maakye"
+    print(result.text)  # the Twi translation
 ```
 
 ### Transcribe audio
@@ -74,7 +74,9 @@ with KhayaClient(api_key) as khaya:
     ...
 ```
 
-If you manage the lifecycle yourself, call `khaya.http_client.close()` when you are done.
+If you manage the lifecycle yourself, call `khaya.http_client.close()`, or
+`await khaya.http_client.aclose()` if you have used any `a*` method —
+`aclose()` closes both clients, `close()` leaves an async client open.
 
 ## Next steps
 
