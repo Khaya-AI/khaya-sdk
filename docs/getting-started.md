@@ -74,11 +74,9 @@ with KhayaClient(api_key) as khaya:
     ...
 ```
 
-If you manage the lifecycle yourself, close the client when you are done —
-`khaya.http_client.close()` from synchronous code, or
-`await khaya.http_client.aclose()` if you have used any of the `a*` methods.
-`aclose()` closes both the sync and async clients, so it is the safe choice
-when you are not sure; `close()` leaves an async client open.
+If you manage the lifecycle yourself, call `khaya.http_client.close()`, or
+`await khaya.http_client.aclose()` if you have used any `a*` method —
+`aclose()` closes both clients, `close()` leaves an async client open.
 
 ## Next steps
 

@@ -1,8 +1,8 @@
 name: Live smoke tests
 
-# Unit tests mock every HTTP call, so they stay green while the API behind
-# the SDK is failing. This job exercises the real endpoints on a schedule and
-# opens an issue when they break, instead of waiting for a user to report it.
+# Unit tests mock every HTTP call, so they stay green while the real API is
+# down. This exercises the live endpoints daily and opens an issue if they
+# break.
 
 on:
   schedule:
@@ -41,12 +41,9 @@ jobs:
         env:
           KHAYA_API_KEY: ${{ secrets.KHAYA_API_KEY }}
         run: |
-          # The `secrets` context is not available in a job-level `if`, so the
-          # check lives here rather than in a step condition.
-          #
-          # This fails rather than warns: the whole point of this workflow is
-          # to notice backend breakage, and a green check that means "ran
-          # nothing" is worse than no check at all.
+          # `secrets` is unavailable in a job-level `if`, so this lives here.
+          # Fails rather than warns: a green check that ran nothing is worse
+          # than no check.
           if [ -z "$KHAYA_API_KEY" ]; then
             echo "::error::KHAYA_API_KEY secret is not set — every integration test would skip and this job would pass without testing anything."
             exit 1
@@ -72,9 +69,7 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # Report via the gh CLI rather than a third-party action: this job holds
-      # issues: write, and an unpinned marketplace action would be an
-      # unnecessary supply-chain surface for what is three API calls.
+      # gh CLI, not a marketplace action: this job holds issues: write.
       - name: Open or update the failure issue
         if: failure()
         env:

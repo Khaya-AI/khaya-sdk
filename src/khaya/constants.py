@@ -1,25 +1,16 @@
 TIMEOUT = 30
 RETRY_ATTEMPTS = 3
 
-# Reference data only — NOT used to validate language input.
+# Reference data for documentation and pickers — not used to validate input.
+# The API accepts several spellings per language (en-tw, en-twi, eng-twi all
+# mean Twi), so a whitelist rejects valid calls. SUPPORTED_TTS_SPEAKERS is the
+# one exception; see its note below.
 #
-# The API accepts several spellings for the same language (``en-tw``,
-# ``en-twi`` and ``eng-twi`` all translate to Twi), so rejecting or warning on
-# codes absent from these sets produced false positives on valid calls. The
-# API is the authority on what it accepts; these lists exist for documentation
-# and for callers who want to offer a picker.
-#
-# SUPPORTED_TTS_SPEAKERS is the exception — see its note below.
-#
-# The Khaya API is versioned per service, and the SDK currently calls v1 of
-# each. Newer versions exist (translation v2, ASR v2 and v3, TTS v2) and offer
-# richer responses; the language catalogues below are taken from whichever
-# version publishes one, then checked against the v1 endpoint the SDK calls.
+# The SDK calls v1 of each service. These lists come from whichever version
+# publishes a catalogue, then checked against v1.
 
-# Translation language pairs (source-target).
-# Verified against the /v1/languages endpoint. Note that endpoint reports
-# three-letter codes (twi, ewe, yor, kik) for several languages listed here
-# with two-letter codes; both forms are accepted by /v1/translate.
+# Translation pairs, source-target. From /v1/languages, which reports
+# three-letter codes; /v1/translate accepts both forms.
 SUPPORTED_LANGUAGE_PAIRS: frozenset[str] = frozenset(
     {
         "en-tw",  # English → Twi
@@ -47,14 +38,9 @@ SUPPORTED_LANGUAGE_PAIRS: frozenset[str] = frozenset(
     }
 )
 
-# Languages supported for ASR.
-# Verified against GET /asr/v3/languages (34 entries). The SDK calls the v1
-# transcribe endpoint, which accepts every one of these codes — checked by
-# posting a sample .wav for each.
-#
-# These are ISO 639-3. An earlier revision of this list carried legacy
-# spellings, nine of which the API rejects outright: en_gh, gon, kas, kon_k,
-# kon_l, mam, pid, wal, wo. Their replacements are below.
+# ASR languages, ISO 639-3, from /asr/v3/languages. The v1 endpoint the SDK
+# calls accepts all of them. An earlier revision used legacy spellings, nine
+# of which the API rejects; replacements are marked below.
 SUPPORTED_ASR_LANGUAGES: frozenset[str] = frozenset(
     {
         "eng",  # African English (was en_gh)
@@ -94,11 +80,8 @@ SUPPORTED_ASR_LANGUAGES: frozenset[str] = frozenset(
     }
 )
 
-# Languages supported for TTS.
-# Verified against GET /tts/v2/languages (32 entries); /tts/v1/languages
-# returns the same set.
-# Note: TTS language codes differ from ASR codes for some languages —
-# Konkomba is lxn/xon here but xon_likoonli/xon_likpakpaanl for ASR.
+# TTS languages, from /tts/v2/languages (/tts/v1/languages returns the same).
+# Some codes differ from ASR: Konkomba is lxn/xon here, xon_* for ASR.
 SUPPORTED_TTS_LANGUAGES: frozenset[str] = frozenset(
     {
         "atw",  # Akuapem Twi
@@ -136,11 +119,7 @@ SUPPORTED_TTS_LANGUAGES: frozenset[str] = frozenset(
     }
 )
 
-# Available TTS speakers.
-# Source: /tts/v1/speakers endpoint.
-#
-# Unlike the language lists, this one IS enforced (see khaya.services.tts).
-# The set is small and closed, and the API silently falls back to its default
-# voice for an unrecognised value instead of returning an error — so a typo
-# would otherwise produce the wrong voice with no signal at all.
+# From /tts/v1/speakers. Unlike the language lists this one IS enforced (see
+# khaya.services.tts): the set is closed, and the API silently falls back to
+# its default voice rather than erroring on a typo.
 SUPPORTED_TTS_SPEAKERS: frozenset[str] = frozenset({"male_low", "male_high", "female"})

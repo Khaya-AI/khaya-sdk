@@ -87,17 +87,16 @@ with KhayaClient(api_key) as khaya:
 
 The `speaker` argument is optional — the API uses a default voice when omitted.
 
-Unlike language codes, an unrecognised speaker is rejected by the SDK before
-the request is sent:
+An unrecognised speaker is rejected before the request is sent:
 
 ```python
 khaya.synthesize("Maakye", "twi", speaker="robot")
 # TTSGenerationError: Unknown speaker 'robot'. Supported speakers: female, male_high, male_low
 ```
 
-The API accepts any string here and silently falls back to its default
-voice, so a typo would otherwise produce the wrong voice with no error.
-`khaya.constants.SUPPORTED_TTS_SPEAKERS` holds the accepted values.
+The API accepts any string here and silently uses its default voice, so a
+typo would otherwise go unnoticed. `khaya.constants.SUPPORTED_TTS_SPEAKERS`
+holds the accepted values.
 
 ## Playing audio directly
 
@@ -120,10 +119,9 @@ with KhayaClient(api_key) as khaya:
 
 The API has a per-request character limit. For longer content, split into sentences:
 
-Each call returns a complete WAV file, header and all. Concatenating the bytes
-does **not** work: `b"".join(parts)` produces a file whose first header
-declares only the first chunk's length, so every decoder plays chunk one and
-ignores the rest. Decode the parts and write a single stream instead:
+Each call returns a complete WAV file. Concatenating the bytes does **not**
+work — the first header declares only the first chunk's length. Decode the
+parts and write a single stream:
 
 ```python
 import io
@@ -147,8 +145,7 @@ for part in parts:
 sf.write("output.wav", np.concatenate(frames), samplerate)
 ```
 
-`soundfile` is not a dependency of the SDK — install it with
-`pip install soundfile` (it brings `numpy`).
+`soundfile` is not an SDK dependency: `pip install soundfile`.
 
 ## Error handling
 

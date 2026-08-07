@@ -28,8 +28,7 @@ TRANSLATE_URL = f"{BASE_URL}/v1/translate"
 TTS_URL = f"{BASE_URL}/tts/v1/tts"
 ASR_URL = f"{BASE_URL}/asr/v1/transcribe"
 
-# A minimal but genuine RIFF/WAVE header. TTS responses must look like audio
-# or the content-type guard rejects them.
+# TTS responses must look like audio or the content-type guard rejects them.
 WAV_BYTES = b"RIFF$\x00\x00\x00WAVEfmt " + b"\x00" * 24
 AUDIO_HEADERS = {"content-type": "audio/wav"}
 
@@ -180,8 +179,7 @@ class TestSynthesize:
         route = respx_mock.post(TTS_URL)
         with pytest.raises(TTSGenerationError, match="Unknown speaker"):
             make_client().synthesize("Hello", "twi", speaker="robot")
-        # The API silently substitutes its default voice, so the check has to
-        # happen client-side — and must not burn a request.
+        # Must not burn a request.
         assert route.call_count == 0
 
     def test_non_audio_200_raises_rather_than_returning_html(self, respx_mock):

@@ -13,8 +13,7 @@
 
 ## Environment variables
 
-Every setting can come from a `KHAYA_`-prefixed environment variable instead
-of an argument:
+Every setting can come from a `KHAYA_`-prefixed environment variable:
 
 | Variable | Sets |
 |----------|------|
@@ -36,11 +35,10 @@ from khaya.config import Settings
 config = Settings()          # picks up KHAYA_API_KEY, KHAYA_TIMEOUT, ...
 ```
 
-The prefix is required. Unprefixed names like `BASE_URL` are ignored — they
-are common enough in application environments that binding to them would let
-an unrelated variable redirect your API key to another host.
+Unprefixed names like `BASE_URL` are ignored, so an unrelated variable
+cannot redirect your API key.
 
-`DevSettings` additionally reads a local `.env` file:
+`DevSettings` also reads a local `.env` file:
 
 ```python
 from khaya.config import DevSettings

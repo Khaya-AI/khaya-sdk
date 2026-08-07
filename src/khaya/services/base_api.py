@@ -116,9 +116,7 @@ def decode_json(response: httpx.Response) -> Any:
 def _backoff_delay(attempt: int) -> float:
     """Exponential backoff with jitter, capped like Retry-After.
 
-    An uncapped 2**attempt reaches 8.5 minutes of sleeping by
-    ``retry_attempts=10`` — a value the configuration guide invites tuning —
-    with no way for the caller to interrupt it.
+    Uncapped, ``retry_attempts=10`` sleeps for ~8.5 uninterruptible minutes.
     """
     return min((2**attempt) + random.uniform(0, 1), MAX_RETRY_AFTER_SECONDS)
 

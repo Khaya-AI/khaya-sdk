@@ -10,20 +10,16 @@ from khaya.utils import check_authentication
 
 logger = logging.getLogger(__name__)
 
-# Canonical RIFF/WAVE magic bytes. Translation and ASR are protected by
-# decode_json(), which rejects a non-JSON 2xx; TTS never decodes JSON, so
-# without this check a gateway error page served as a 200 becomes "audio" and
-# save() writes an HTML file with a .wav extension.
+# TTS never decodes JSON, so decode_json()'s non-JSON guard never runs here:
+# without this, a gateway HTML error page served as a 200 is saved as a .wav.
 _WAV_MAGIC = b"RIFF"
 
 
 def _build_payload(text: str, language: str, speaker: str | None) -> dict:
     if not text or not language:
         raise TTSGenerationError("Text and language are required", 400)
-    # Unlike language codes, the speaker set is small, closed, and served by
-    # /tts/v1/speakers — and the API silently substitutes its default for an
-    # unrecognised value rather than erroring, so a typo would otherwise be
-    # invisible.
+    # The API substitutes its default voice for an unknown speaker instead of
+    # erroring, so a typo is otherwise invisible.
     if speaker is not None and speaker not in SUPPORTED_TTS_SPEAKERS:
         raise TTSGenerationError(
             f"Unknown speaker {speaker!r}. Supported speakers: "
