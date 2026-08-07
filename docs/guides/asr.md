@@ -25,39 +25,40 @@ The second argument is the **language code** of the spoken language in the audio
 
 | Code | Language |
 |------|----------|
-| `ada` | Adangme |
-| `en_gh` | African English |
+| `eng` | African English |
+| `fra` | African French |
 | `atw` | Akuapem Twi |
-| `tw` | Asante Twi |
+| `bwu` | Buli |
 | `dga` | Dagaare |
 | `dag` | Dagbani |
-| `ee` | Ewe |
+| `ada` | Dangme |
+| `ewe` | Ewe |
 | `fat` | Fante |
-| `fra` | French |
 | `gaa` | Ga |
-| `gon` | Gonja |
+| `gjn` | Gonja |
 | `gur` | Gurene |
-| `ha` | Hausa |
-| `ig` | Igbo |
-| `kas` | Kasem |
-| `ki` | Kikuyu |
-| `kon_k` | Konkomba (Likoonli) |
-| `kon_l` | Konkomba (Likpakpaanl) |
+| `hau` | Hausa |
+| `ibo` | Igbo |
+| `xsm` | Kasem |
+| `kik` | Kikuyu |
+| `kin` | Kinyarwanda |
+| `xon_likoonli` | Konkomba-Likoonli |
+| `xon_likpakpaanl` | Konkomba-Likpakpaanl |
 | `kri` | Krio |
 | `kus` | Kusaal |
 | `luo` | Luo |
-| `mam` | Mampruli |
+| `maw` | Mampruli |
 | `men` | Mende |
-| `mer` | Meru/Kimeru |
+| `mer` | Meru |
+| `pcm` | Naija Pidgin |
 | `nzi` | Nzema |
-| `pid` | Pidgin |
-| `sn` | Shona |
-| `sw` | Swahili |
+| `sna` | Shona |
+| `swa` | Swahili |
 | `tem` | Temne |
-| `wal` | Wali |
-| `wo` | Wolof |
-| `yo` | Yoruba |
-
+| `twi` | Twi |
+| `wlx` | Wali |
+| `wol` | Wolof |
+| `yor` | Yoruba |
 ## Audio requirements
 
 - **Format:** WAV (`.wav`)

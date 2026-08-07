@@ -113,6 +113,16 @@ def decode_json(response: httpx.Response) -> Any:
         ) from e
 
 
+def _backoff_delay(attempt: int) -> float:
+    """Exponential backoff with jitter, capped like Retry-After.
+
+    An uncapped 2**attempt reaches 8.5 minutes of sleeping by
+    ``retry_attempts=10`` — a value the configuration guide invites tuning —
+    with no way for the caller to interrupt it.
+    """
+    return min((2**attempt) + random.uniform(0, 1), MAX_RETRY_AFTER_SECONDS)
+
+
 def _retry_after_delay(response: httpx.Response | None) -> float | None:
     """Return the capped Retry-After delay, or None if absent/unparseable."""
     if response is None:
@@ -196,7 +206,7 @@ class BaseApi:
             logger.debug("Respecting Retry-After header: sleeping %.1fs", delay)
             time.sleep(delay)
             return
-        delay = (2**attempt) + random.uniform(0, 1)
+        delay = _backoff_delay(attempt)
         logger.debug("Backing off %.1fs before next attempt", delay)
         time.sleep(delay)
 
@@ -206,7 +216,7 @@ class BaseApi:
             logger.debug("Respecting Retry-After header: sleeping %.1fs", delay)
             await asyncio.sleep(delay)
             return
-        delay = (2**attempt) + random.uniform(0, 1)
+        delay = _backoff_delay(attempt)
         logger.debug("Backing off %.1fs before next attempt", delay)
         await asyncio.sleep(delay)
 

@@ -58,9 +58,9 @@ def test_config_from_env_file(tmp_path, monkeypatch):
     monkeypatch.delenv("KHAYA_API_KEY", raising=False)
 
     env_file = tmp_path / ".env"
-    env_file.write_text("KHAYA_API_KEY=test_api_key\n")
+    env_file.write_text("KHAYA_API_KEY=from_env_file\n")
 
-    monkeypatch.setenv("KHAYA_API_KEY", "test_api_key")
-
+    # Deliberately no monkeypatch.setenv here: with the variable also exported,
+    # the assertion passes whether or not _env_file is ever read.
     config = DevSettings(_env_file=str(env_file))
-    assert config.api_key == "test_api_key"
+    assert config.api_key == "from_env_file"

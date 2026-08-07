@@ -119,23 +119,50 @@ Language pair format: `"<source>-<target>"`, e.g. `"en-tw"` or `"tw-en"`. All pa
 
 | Code | Language |
 |------|----------|
-| `tw` | Twi |
-| `gaa` | Ga |
+| `eng` | African English |
+| `fra` | African French |
+| `atw` | Akuapem Twi |
+| `bwu` | Buli |
+| `dga` | Dagaare |
 | `dag` | Dagbani |
-| `yo` | Yoruba |
-| `ee` | Ewe |
-| `ki` | Kikuyu |
-| `ha` | Hausa |
-
+| `ada` | Dangme |
+| `ewe` | Ewe |
+| `fat` | Fante |
+| `gaa` | Ga |
+| `gjn` | Gonja |
+| `gur` | Gurene |
+| `hau` | Hausa |
+| `ibo` | Igbo |
+| `xsm` | Kasem |
+| `kik` | Kikuyu |
+| `kin` | Kinyarwanda |
+| `xon_likoonli` | Konkomba-Likoonli |
+| `xon_likpakpaanl` | Konkomba-Likpakpaanl |
+| `kri` | Krio |
+| `kus` | Kusaal |
+| `luo` | Luo |
+| `maw` | Mampruli |
+| `men` | Mende |
+| `mer` | Meru |
+| `pcm` | Naija Pidgin |
+| `nzi` | Nzema |
+| `sna` | Shona |
+| `swa` | Swahili |
+| `tem` | Temne |
+| `twi` | Twi |
+| `wlx` | Wali |
+| `wol` | Wolof |
+| `yor` | Yoruba |
 ### TTS languages
 
 | Code | Language |
 |------|----------|
-| `ada` | Adangme |
 | `atw` | Akuapem Twi |
 | `twi` | Asante Twi |
-| `dag` | Dagbani |
 | `dga` | Dagaare |
+| `dag` | Dagbani |
+| `ada` | Dangme |
+| `eng` | English |
 | `ewe` | Ewe |
 | `fat` | Fante |
 | `fra` | French |
@@ -146,14 +173,14 @@ Language pair format: `"<source>-<target>"`, e.g. `"en-tw"` or `"tw-en"`. All pa
 | `ibo` | Igbo |
 | `xsm` | Kasem |
 | `kik` | Kikuyu |
-| `xon` | Konkomba (Likpakpaanl) |
 | `lxn` | Konkomba (Likoonli) |
+| `xon` | Konkomba (Likpakpaanl) |
 | `kri` | Krio |
 | `kus` | Kusaal |
 | `luo` | Luo |
 | `maw` | Mampruli |
 | `men` | Mende |
-| `mer` | Meru / Kimeru |
+| `mer` | Meru/Kimeru |
 | `nzi` | Nzema |
 | `pcm` | Pidgin |
 | `sna` | Shona |
@@ -162,7 +189,6 @@ Language pair format: `"<source>-<target>"`, e.g. `"en-tw"` or `"tw-en"`. All pa
 | `wlx` | Wali |
 | `wol` | Wolof |
 | `yor` | Yoruba |
-
 ## Configuration
 
 ```python

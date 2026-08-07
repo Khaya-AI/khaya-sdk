@@ -9,7 +9,7 @@ from khaya import KhayaClient
 
 with KhayaClient(api_key) as khaya:
     result = khaya.translate("Hello, how are you?", "en-tw")
-    print(result.text)  # "Ɛte sɛn?"
+    print(result.text)  # the Twi translation
 ```
 
 The second argument is the **language pair**: `"<source>-<target>"`.
@@ -70,7 +70,7 @@ with KhayaClient(api_key) as khaya:
 | `target_language` | `str` | Target language code (e.g. `"tw"`) |
 
 ```python
-print(result.text)            # "Mema wo akye"
+print(result.text)            # the translated text
 print(result.source_language) # "en"
 print(result.target_language) # "tw"
 ```

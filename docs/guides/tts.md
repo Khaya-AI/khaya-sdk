@@ -36,11 +36,12 @@ with KhayaClient(api_key) as khaya:
 
 | Code | Language |
 |------|----------|
-| `ada` | Adangme |
 | `atw` | Akuapem Twi |
 | `twi` | Asante Twi |
-| `dag` | Dagbani |
 | `dga` | Dagaare |
+| `dag` | Dagbani |
+| `ada` | Dangme |
+| `eng` | English |
 | `ewe` | Ewe |
 | `fat` | Fante |
 | `fra` | French |
@@ -51,8 +52,8 @@ with KhayaClient(api_key) as khaya:
 | `ibo` | Igbo |
 | `xsm` | Kasem |
 | `kik` | Kikuyu |
-| `xon` | Konkomba (Likpakpaanl) |
 | `lxn` | Konkomba (Likoonli) |
+| `xon` | Konkomba (Likpakpaanl) |
 | `kri` | Krio |
 | `kus` | Kusaal |
 | `luo` | Luo |
@@ -86,6 +87,18 @@ with KhayaClient(api_key) as khaya:
 
 The `speaker` argument is optional — the API uses a default voice when omitted.
 
+Unlike language codes, an unrecognised speaker is rejected by the SDK before
+the request is sent:
+
+```python
+khaya.synthesize("Maakye", "twi", speaker="robot")
+# TTSGenerationError: Unknown speaker 'robot'. Supported speakers: female, male_high, male_low
+```
+
+The API accepts any string here and silently falls back to its default
+voice, so a typo would otherwise produce the wrong voice with no error.
+`khaya.constants.SUPPORTED_TTS_SPEAKERS` holds the accepted values.
+
 ## Playing audio directly
 
 Use any audio library to play back without saving to disk:
@@ -107,20 +120,35 @@ with KhayaClient(api_key) as khaya:
 
 The API has a per-request character limit. For longer content, split into sentences:
 
+Each call returns a complete WAV file, header and all. Concatenating the bytes
+does **not** work: `b"".join(parts)` produces a file whose first header
+declares only the first chunk's length, so every decoder plays chunk one and
+ignores the rest. Decode the parts and write a single stream instead:
+
 ```python
+import io
 import re
+
+import numpy as np
+import soundfile as sf
 
 def split_sentences(text: str) -> list[str]:
     return [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
 
 with KhayaClient(api_key) as khaya:
-    chunks = split_sentences(long_text)
-    audio_parts = [khaya.synthesize(chunk, "twi").audio for chunk in chunks]
+    parts = [khaya.synthesize(chunk, "twi").audio for chunk in split_sentences(long_text)]
 
-combined = b"".join(audio_parts)
-with open("output.wav", "wb") as f:
-    f.write(combined)
+frames = []
+samplerate = None
+for part in parts:
+    data, samplerate = sf.read(io.BytesIO(part))
+    frames.append(data)
+
+sf.write("output.wav", np.concatenate(frames), samplerate)
 ```
+
+`soundfile` is not a dependency of the SDK — install it with
+`pip install soundfile` (it brings `numpy`).
 
 ## Error handling
 

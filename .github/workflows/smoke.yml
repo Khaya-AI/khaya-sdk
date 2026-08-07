@@ -37,14 +37,19 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen --extra test --extra dev
 
-      - name: Warn if the API key secret is missing
+      - name: Fail if the API key secret is missing
         env:
           KHAYA_API_KEY: ${{ secrets.KHAYA_API_KEY }}
         run: |
           # The `secrets` context is not available in a job-level `if`, so the
           # check lives here rather than in a step condition.
+          #
+          # This fails rather than warns: the whole point of this workflow is
+          # to notice backend breakage, and a green check that means "ran
+          # nothing" is worse than no check at all.
           if [ -z "$KHAYA_API_KEY" ]; then
-            echo "::warning::KHAYA_API_KEY secret is not set — every integration test will skip and this job will pass vacuously."
+            echo "::error::KHAYA_API_KEY secret is not set — every integration test would skip and this job would pass without testing anything."
+            exit 1
           fi
 
       - name: Run integration tests against the live API
