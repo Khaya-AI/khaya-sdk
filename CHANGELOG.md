@@ -30,6 +30,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in response shape, latency and output, so there is nothing to gain. Neither
   service has a v3.
 
+---
+
+## [0.2.1] — 2026-08-07
+
+Documentation, packaging and tooling only. No behaviour changes.
+
+### Added
+
+- The Khaya logo in the README header and as the documentation site logo and
+  favicon.
+
 - `docs/languages.md` — one reference page for translation pairs, ASR and TTS
   languages, and TTS speakers, generated from the API's catalogues. Guides and
   the README link to it instead of carrying their own copies, and a test pins
@@ -49,6 +60,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PRINCIPLES.md` rule 3 still required `httpx.Response` returns and TypedDicts,
   contradicting the typed results introduced in 0.2.0; rule 13 described
   integration tests as skipped in CI, which the scheduled smoke run changed.
+- The README's PyPI version badge pointed at `badge.fury.io`, which now returns
+  an empty response — the badge rendered broken, or as a stale cached `0.1.1`.
+  All badges are served by shields.io and read live package metadata.
+- `release.yml` and `smoke.yml` were left on `actions/checkout@v4` and
+  `astral-sh/setup-uv@v4` when the dependency bumps moved `ci.yml` to v7; both
+  predated those workflow files.
+
+### Changed
+
+- The README's three language tables are replaced by a summary and a link to
+  the new reference page, cutting roughly 95 lines from the page.
+- Dependency bumps: `pydantic` 2.13.4, `pydantic-settings` 2.14.2,
+  `pre-commit` 4.6.1, and the dev-tooling group (`ruff` 0.16.1, `mypy` 2.3.0,
+  and others).
 
 ---
 
