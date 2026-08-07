@@ -16,36 +16,15 @@ The second argument is the **language pair**: `"<source>-<target>"`.
 
 ## Supported language pairs
 
-| Pair | Direction |
-|------|-----------|
-| `en-tw` | English → Twi |
-| `tw-en` | Twi → English |
-| `en-ee` | English → Ewe |
-| `ee-en` | Ewe → English |
-| `en-gaa` | English → Ga |
-| `gaa-en` | Ga → English |
-| `en-fat` | English → Fante |
-| `fat-en` | Fante → English |
-| `en-yo` | English → Yoruba |
-| `yo-en` | Yoruba → English |
-| `en-dag` | English → Dagbani |
-| `dag-en` | Dagbani → English |
-| `en-ki` | English → Kikuyu |
-| `ki-en` | Kikuyu → English |
-| `en-gur` | English → Gurune |
-| `gur-en` | Gurune → English |
-| `en-luo` | English → Luo |
-| `luo-en` | Luo → English |
-| `en-mer` | English → Kimeru |
-| `mer-en` | Kimeru → English |
-| `en-kus` | English → Kusaal |
-| `kus-en` | Kusaal → English |
+22 pairs across 12 languages, bidirectional with English as the pivot — see the
+[language reference](../languages.md#translation-pairs).
 
 !!! note
-    The table above is reference data, not a whitelist — the SDK does not validate
-    language codes and will send whatever you pass. The API accepts several spellings
-    for the same language (`en-tw`, `en-twi` and `eng-twi` all translate to Twi), so
-    you can use any pair the API supports without waiting for an SDK release.
+    That table is reference data, not a whitelist. The SDK does not validate
+    language codes and will send whatever you pass. The API accepts several
+    spellings for the same language (`en-tw`, `en-twi` and `eng-twi` all
+    translate to Twi), so you can use any pair the API supports without waiting
+    for an SDK release.
 
     An unsupported pair is rejected by the API with an `APIError` carrying
     `code="VALIDATION_FAILED"` and a `details` entry naming the offending field.

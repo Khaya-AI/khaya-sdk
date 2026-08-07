@@ -23,42 +23,9 @@ The second argument is the **language code** of the spoken language in the audio
 
 ## Supported languages
 
-| Code | Language |
-|------|----------|
-| `eng` | African English |
-| `fra` | African French |
-| `atw` | Akuapem Twi |
-| `bwu` | Buli |
-| `dga` | Dagaare |
-| `dag` | Dagbani |
-| `ada` | Dangme |
-| `ewe` | Ewe |
-| `fat` | Fante |
-| `gaa` | Ga |
-| `gjn` | Gonja |
-| `gur` | Gurene |
-| `hau` | Hausa |
-| `ibo` | Igbo |
-| `xsm` | Kasem |
-| `kik` | Kikuyu |
-| `kin` | Kinyarwanda |
-| `xon_likoonli` | Konkomba-Likoonli |
-| `xon_likpakpaanl` | Konkomba-Likpakpaanl |
-| `kri` | Krio |
-| `kus` | Kusaal |
-| `luo` | Luo |
-| `maw` | Mampruli |
-| `men` | Mende |
-| `mer` | Meru |
-| `pcm` | Naija Pidgin |
-| `nzi` | Nzema |
-| `sna` | Shona |
-| `swa` | Swahili |
-| `tem` | Temne |
-| `twi` | Twi |
-| `wlx` | Wali |
-| `wol` | Wolof |
-| `yor` | Yoruba |
+34 languages — see the [language reference](../languages.md#asr-languages).
+ASR and TTS use different codes for some languages, so check the right table.
+
 ## Audio requirements
 
 - **Format:** WAV (`.wav`)

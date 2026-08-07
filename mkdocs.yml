@@ -7,6 +7,8 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
+  logo: assets/khaya-logo.png
+  favicon: assets/khaya-logo.png
   palette:
     - scheme: default
       primary: black
@@ -68,6 +70,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - Languages: languages.md
   - Guides:
       - Translation: guides/translation.md
       - Speech Recognition: guides/asr.md

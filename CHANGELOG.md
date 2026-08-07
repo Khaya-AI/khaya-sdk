@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `docs/languages.md` — one reference page for translation pairs, ASR and TTS
+  languages, and TTS speakers, generated from the API's catalogues. Guides and
+  the README link to it instead of carrying their own copies, and a test pins
+  it to `khaya.constants` so the two cannot drift.
+- `internals.md` documents which API version each service calls, and what the
+  newer versions offer.
+
+### Fixed
+
+- `internals.md` still described the exponential backoff as uncapped.
+- The docs site landing page carried a dead `badge.fury.io` version badge and
+  described the product as the "GhanaNLP Khaya API" while the README called it
+  the "Khaya AI API".
+- The getting-started TTS example used `"tw"`, which is absent from the TTS
+  language table, and wrote the audio by hand rather than using
+  `SynthesisResult.save()`.
+- `PRINCIPLES.md` rule 3 still required `httpx.Response` returns and TypedDicts,
+  contradicting the typed results introduced in 0.2.0; rule 13 described
+  integration tests as skipped in CI, which the scheduled smoke run changed.
+
 ---
 
 ## [0.2.0] — 2026-08-07
