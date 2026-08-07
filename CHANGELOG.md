@@ -29,6 +29,7 @@ client-side language validation. See **Changed** for the migration notes.
   - `khaya.services.translation` — character count and language pair per request.
   - `khaya.services.asr` — language and audio file size per request.
   - `khaya.services.tts` — character count, language, and output audio size per request.
+- `SUPPORTED_LANGUAGE_PAIRS`, `SUPPORTED_ASR_LANGUAGES`, `SUPPORTED_TTS_LANGUAGES`, and `SUPPORTED_TTS_SPEAKERS` are exported from the top-level package; they previously had to be imported from `khaya.constants`.
 - `NullHandler` on the `khaya` logger in `__init__.py` — SDK is silent by default.
 - MkDocs Material documentation site with guides, API reference, and architecture diagrams.
 - Scheduled live smoke tests (`.github/workflows/smoke.yml`) that exercise the real endpoints daily and open an issue when they break. Unit tests mock every HTTP call, so they stay green through a backend outage.
@@ -57,6 +58,8 @@ client-side language validation. See **Changed** for the migration notes.
 - `docs/getting-started.md` recommended `http_client.close()` for manual lifecycle management, which leaves an `AsyncClient` open. It now points at `aclose()`.
 - Sphinx `:meth:`/`:class:` roles in docstrings rendered as literal text under mkdocstrings, which is configured for Google style.
 - `smoke.yml` passed vacuously when `KHAYA_API_KEY` was unset — every test skipped and the job went green. It now fails.
+- `release.yml` validated the version only on the tag path. A manual dispatch to PyPI checked nothing; it now requires the checked-out commit to carry the matching tag.
+- `internals.md` claimed the service layer builds "the correct JSON body or multipart form". ASR posts raw bytes.
 - `test_config_from_env_file` set the environment variable it was using the `.env` file to test, so it passed whether or not the file was read.
 
 ### Removed

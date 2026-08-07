@@ -28,13 +28,14 @@ permissions:
 
 jobs:
   validate:
-    name: Validate version tag
-    if: github.event_name == 'push'
+    name: Validate version
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get_version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Get version from pyproject.toml
         id: get_version
@@ -46,24 +47,29 @@ jobs:
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Verify tag matches package version
+      # A dispatch can target any ref, so PyPI publishes require a matching
+      # tag on the checked-out commit. TestPyPI is a rehearsal and does not.
+      - name: Verify the version is tagged
+        env:
+          VERSION: ${{ steps.get_version.outputs.version }}
+          TARGET: ${{ inputs.target }}
         run: |
-          TAG="${GITHUB_REF_NAME#v}"
-          PKG="${{ steps.get_version.outputs.version }}"
-          if [ "$TAG" != "$PKG" ]; then
-            echo "::error::Tag '${GITHUB_REF_NAME}' does not match pyproject.toml version '${PKG}'"
-            exit 1
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            if [ "${GITHUB_REF_NAME#v}" != "$VERSION" ]; then
+              echo "::error::Tag '${GITHUB_REF_NAME}' does not match pyproject.toml version '${VERSION}'"
+              exit 1
+            fi
+          elif [ "$TARGET" = "pypi" ]; then
+            if ! git tag --points-at HEAD | grep -qx "v${VERSION}"; then
+              echo "::error::HEAD is not tagged v${VERSION}; tag the commit or publish to testpypi instead"
+              exit 1
+            fi
           fi
+          echo "Publishing version ${VERSION}"
 
   test:
     name: Test (Python ${{ matrix.python-version }})
     needs: [validate]
-    # `validate` is skipped on dispatch, which would skip this job too.
-    if: |
-      always() && (
-        needs.validate.result == 'success' ||
-        needs.validate.result == 'skipped'
-      )
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true

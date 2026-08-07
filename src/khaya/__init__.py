@@ -1,6 +1,12 @@
 import logging
 from importlib.metadata import version
 
+from .constants import (
+    SUPPORTED_ASR_LANGUAGES,
+    SUPPORTED_LANGUAGE_PAIRS,
+    SUPPORTED_TTS_LANGUAGES,
+    SUPPORTED_TTS_SPEAKERS,
+)
 from .exceptions import (
     APIError,
     ASRTranscriptionError,
@@ -31,4 +37,9 @@ __all__ = [
     "TranslationError",
     "TTSGenerationError",
     "ASRTranscriptionError",
+    # Reference data
+    "SUPPORTED_LANGUAGE_PAIRS",
+    "SUPPORTED_ASR_LANGUAGES",
+    "SUPPORTED_TTS_LANGUAGES",
+    "SUPPORTED_TTS_SPEAKERS",
 ]

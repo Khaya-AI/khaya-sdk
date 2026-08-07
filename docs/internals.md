@@ -35,7 +35,7 @@ The public entry point. Holds one instance of each service and delegates every m
 
 - **Input validation** — raises a service-specific exception (`TranslationError`, etc.) before any HTTP call is made
 - **No language validation** — language codes are passed through untouched. The API accepts multiple spellings per language and adds languages independently of SDK releases, so client-side checking produced false rejections of valid calls. The API is the authority; unsupported codes come back as an `APIError` with a `VALIDATION_FAILED` code.
-- **Payload construction** — builds the correct JSON body or multipart form for the endpoint
+- **Payload construction** — a JSON body for translation and TTS; ASR posts the raw audio bytes with the language as a query parameter
 - **Authentication guard** — the `@check_authentication` decorator raises `AuthenticationError` immediately if no API key is configured
 
 ### BaseApi

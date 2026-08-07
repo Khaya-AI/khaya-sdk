@@ -73,6 +73,9 @@ The SDK retries automatically on:
 
 **401 Unauthorized** is never retried.
 
+All three endpoints are POST and metered, so a 500 the backend actually
+processed is retried and billed again. Set `retry_attempts=1` to disable.
+
 Retries use exponential backoff with jitter: `delay = 2^attempt + random(0, 1)` seconds,
 capped at 60s. A `Retry-After` header takes precedence and is capped at the same 60s.
 
