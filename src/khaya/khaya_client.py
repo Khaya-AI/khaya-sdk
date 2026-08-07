@@ -1,6 +1,6 @@
 from khaya.config import Settings
 from khaya.models import SynthesisResult, TranscriptionResult, TranslationResult
-from khaya.services.asr import AsrService
+from khaya.services.asr import AsrService, Granularity
 from khaya.services.base_api import BaseApi
 from khaya.services.translation import TranslationService
 from khaya.services.tts import TtsService
@@ -76,17 +76,24 @@ class KhayaClient:
         """
         return self.translation.translate(text, language_pair)
 
-    def transcribe(self, audio_file_path: str, language: str = "tw") -> TranscriptionResult:
+    def transcribe(
+        self,
+        audio_file_path: str,
+        language: str = "twi",
+        timestamps: Granularity | None = None,
+    ) -> TranscriptionResult:
         """Transcribe an audio file to text.
 
         Args:
             audio_file_path: Path to the .wav audio file.
-            language: Language spoken in the audio (e.g. ``"tw"`` for Twi).
+            language: Language spoken in the audio (e.g. ``"twi"`` for Twi).
+            timestamps: Request alignment data — ``"word"`` or ``"segment"``.
 
         Returns:
-            TranscriptionResult with ``.text`` and ``.language``.
+            TranscriptionResult with ``.text``, ``.language``, ``.warnings``,
+            and ``.timings`` when requested.
         """
-        return self.asr.transcribe(audio_file_path, language)
+        return self.asr.transcribe(audio_file_path, language, timestamps)
 
     def synthesize(
         self,
@@ -113,9 +120,14 @@ class KhayaClient:
         """Async version of `translate()`."""
         return await self.translation.atranslate(text, language_pair)
 
-    async def atranscribe(self, audio_file_path: str, language: str = "tw") -> TranscriptionResult:
+    async def atranscribe(
+        self,
+        audio_file_path: str,
+        language: str = "twi",
+        timestamps: Granularity | None = None,
+    ) -> TranscriptionResult:
         """Async version of `transcribe()`."""
-        return await self.asr.atranscribe(audio_file_path, language)
+        return await self.asr.atranscribe(audio_file_path, language, timestamps)
 
     async def asynthesize(
         self,

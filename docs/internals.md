@@ -141,13 +141,17 @@ of all three:
 | Service | SDK calls | Also available |
 |---------|-----------|----------------|
 | Translation | `/v1/translate` | `/v2/translate` — same response shape |
-| ASR | `/asr/v1/transcribe` | `/asr/v2/`, `/asr/v3/` — structured body with `warnings`, word/segment timing, long-form audio |
+| ASR | `/asr/v3/transcribe` | `/asr/v1/`, `/asr/v2/` — v1 returns a bare string with no warnings or timings |
 | TTS | `/tts/v1/tts` | `/tts/v2/synthesize` |
 
-v1 returns a bare string from ASR, so the SDK cannot currently surface the
-`warnings` newer versions emit — including the notice that legacy language
-codes are deprecated in favour of ISO 639-3. See the
-[language reference](languages.md#language-codes-legacy-and-iso-639-3).
+ASR moved to v3 because it is the only version change that earns itself:
+same latency as v1 (measured at 0.65s on a 1.2s clip and 3.1s on a 22.8s
+clip), but a structured body carrying `warnings` and optional word/segment
+timings. Translation v2 and TTS v2 are identical to v1 in shape, latency and
+output, so the SDK stays on v1 for those. Set `Settings.asr_version` to pin
+an older version.
+
+TTS has no v3, and translation has no v3 — v2 is the ceiling for both.
 
 Only `/asr/v1/languages` has no catalogue endpoint; `SUPPORTED_ASR_LANGUAGES`
 is therefore generated from `/asr/v3/languages`, whose codes v1 also accepts.

@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **ASR now calls API v3.** Same latency as v1 (measured 0.65s on a 1.2s clip,
+  3.1s on a 22.8s clip) but a structured response the SDK can read.
+- `TranscriptionResult.warnings` — advisories from the API, such as the notice
+  that `tw` is a deprecated legacy code for `twi`. Also logged at `WARNING`.
+  Always empty on `asr_version="v1"`, which returns a bare string.
+- `transcribe(..., timestamps="word" | "segment")` returns alignment data on
+  `TranscriptionResult.timings`: `unit`, `granularity`, and a list of
+  `WordTiming` or `SegmentTiming` with `start`/`end` offsets in seconds.
+  `Timings`, `WordTiming` and `SegmentTiming` are exported from `khaya`.
+- `Settings.asr_version` (`v1`, `v2`, `v3`; default `v3`), also readable from
+  `KHAYA_ASR_VERSION`.
+
+### Changed
+
+- The default `language` for `transcribe()`/`atranscribe()` is now `"twi"`
+  rather than `"tw"`. Both work; `tw` is the legacy form the API asks callers
+  to move away from.
+- Translation and TTS stay on v1 deliberately: v2 of each is identical to v1
+  in response shape, latency and output, so there is nothing to gain. Neither
+  service has a v3.
+
 ---
 
 ## [0.2.1] — 2026-08-07

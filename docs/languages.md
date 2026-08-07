@@ -11,7 +11,8 @@ lets the API decide — see [why](internals.md#service-layer).
 The API accepts two generations of code, and several spellings resolve to the
 same language: `en-tw`, `en-twi` and `eng-twi` all translate to Twi.
 
-Newer API versions warn about the older forms:
+The API warns about the older forms, and the SDK surfaces those warnings on
+`TranscriptionResult.warnings` (and logs them at `WARNING`):
 
 ```json
 {"text": "Me ho yɛ.",

@@ -65,7 +65,7 @@ with KhayaClient(os.environ["KHAYA_API_KEY"]) as khaya:
 
 ```python
 with KhayaClient(os.environ["KHAYA_API_KEY"]) as khaya:
-    result = khaya.transcribe("recording.wav", "tw")
+    result = khaya.transcribe("recording.wav", "twi")
     print(result.text)
 ```
 

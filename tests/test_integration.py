@@ -85,6 +85,38 @@ def test_transcribe_twi(integration_client):
     assert result.language == "tw"
 
 
+@pytest.mark.integration
+def test_legacy_language_code_surfaces_an_api_warning(integration_client):
+    """v3 advises when a legacy code is used; v1 could not carry the advisory."""
+    result = integration_client.transcribe(str(AUDIO_FIXTURE), "tw")
+    assert result.text.strip()
+    assert any("legacy" in w.lower() for w in result.warnings)
+
+
+@pytest.mark.integration
+def test_iso_language_code_produces_no_warning(integration_client):
+    result = integration_client.transcribe(str(AUDIO_FIXTURE), "twi")
+    assert result.warnings == []
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("granularity", ["word", "segment"])
+def test_timestamps_return_alignment_data(integration_client, granularity):
+    result = integration_client.transcribe(str(AUDIO_FIXTURE), "twi", timestamps=granularity)
+    assert result.timings is not None
+    assert result.timings.granularity == granularity
+    assert result.timings.unit == "seconds"
+    entries = result.timings.words if granularity == "word" else result.timings.segments
+    assert entries, f"no {granularity} timings returned"
+    assert entries[0].start >= 0.0
+    assert entries[-1].end > entries[0].start
+
+
+@pytest.mark.integration
+def test_no_timings_unless_requested(integration_client):
+    assert integration_client.transcribe(str(AUDIO_FIXTURE), "twi").timings is None
+
+
 # ---------------------------------------------------------------------------
 # TTS
 # ---------------------------------------------------------------------------
