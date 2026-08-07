@@ -70,6 +70,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - Languages: languages.md
   - Guides:
       - Translation: guides/translation.md
       - Speech Recognition: guides/asr.md

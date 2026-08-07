@@ -16,8 +16,10 @@ Never lose the original traceback.
 ## 3. Type Everything
 
 All public function signatures must have complete type hints.
-Use `httpx.Response` (not `requests.Response`).
-Define TypedDict for structured dicts if dicts must be returned.
+Public methods return typed result objects (`TranslationResult`,
+`TranscriptionResult`, `SynthesisResult`) — never a raw `httpx.Response` and
+never a bare dict. `httpx` types stay internal to the transport layer.
+Ship `py.typed` so consumers get the types too.
 Run mypy as part of CI — no type errors allowed.
 
 ## 4. No Catch-All Handlers
@@ -76,7 +78,10 @@ Validate all config at client creation — fail fast.
 
 Unit tests must mock all HTTP calls (use `respx` for httpx).
 Tests must pass without network access and without an API key.
-Integration tests must be clearly marked and skipped in CI by default.
+Integration tests are marked `@pytest.mark.integration` and deselected from
+the pull-request run. They are not optional: a scheduled workflow runs them
+against the live API and fails if the key is missing, because mocked tests
+stay green through a backend outage.
 
 ## 14. One Responsibility Per Class/Function
 

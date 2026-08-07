@@ -36,6 +36,9 @@ Get an API key at [https://translation.ghananlp.org](https://translation.ghananl
 export KHAYA_API_KEY=your_api_key_here
 ```
 
+`Settings` also reads `KHAYA_BASE_URL`, `KHAYA_TIMEOUT`, and
+`KHAYA_RETRY_ATTEMPTS`.
+
 ## Quick Start
 
 ```python
@@ -51,8 +54,8 @@ with KhayaClient(os.environ["KHAYA_API_KEY"]) as khaya:
     result = khaya.transcribe("path/to/audio.wav", "tw")
     print(result.text)
 
-    # Synthesize speech in Twi
-    result = khaya.synthesize("Me ho yɛ", "twi")
+    # Synthesize speech in Twi, optionally choosing a voice
+    result = khaya.synthesize("Me ho yɛ", "twi", speaker="female")
     result.save("output.wav")
 ```
 
@@ -111,115 +114,18 @@ except APIError as e:
 
 ## Supported languages
 
-The API is the authority on what it accepts; these lists are reference data,
-generated from its live catalogues. Full tables in the
-[documentation](https://khaya-sdk.readthedocs.io).
+| Service | Languages |
+|---------|-----------|
+| Translation | 12, paired with English (22 pairs) |
+| Speech recognition | 34 |
+| Text-to-speech | 32, with 3 speaker voices |
 
-Translation takes a `"<source>-<target>"` pair such as `"en-tw"`, bidirectional
-with English as the pivot. ASR and TTS take a single language code, and the
-two use different codes for some languages.
+Full tables, and the difference between legacy and ISO 639-3 codes, are in the
+**[language reference](https://khaya-sdk.readthedocs.io/en/latest/languages/)**.
 
-<details>
-<summary><strong>Translation pairs</strong> — 12 languages, paired with English</summary>
-
-| Code | Language |
-|------|----------|
-| `en` | English |
-| `tw` | Twi |
-| `ee` | Ewe |
-| `gaa` | Ga |
-| `fat` | Fante |
-| `yo` | Yoruba |
-| `dag` | Dagbani |
-| `ki` | Kikuyu |
-| `gur` | Gurene |
-| `luo` | Luo |
-| `mer` | Kimeru |
-| `kus` | Kusaal |
-
-</details>
-
-<details>
-<summary><strong>ASR languages</strong> — 34 languages</summary>
-
-| Code | Language |
-|------|----------|
-| `eng` | African English |
-| `fra` | African French |
-| `atw` | Akuapem Twi |
-| `bwu` | Buli |
-| `dga` | Dagaare |
-| `dag` | Dagbani |
-| `ada` | Dangme |
-| `ewe` | Ewe |
-| `fat` | Fante |
-| `gaa` | Ga |
-| `gjn` | Gonja |
-| `gur` | Gurene |
-| `hau` | Hausa |
-| `ibo` | Igbo |
-| `xsm` | Kasem |
-| `kik` | Kikuyu |
-| `kin` | Kinyarwanda |
-| `xon_likoonli` | Konkomba-Likoonli |
-| `xon_likpakpaanl` | Konkomba-Likpakpaanl |
-| `kri` | Krio |
-| `kus` | Kusaal |
-| `luo` | Luo |
-| `maw` | Mampruli |
-| `men` | Mende |
-| `mer` | Meru |
-| `pcm` | Naija Pidgin |
-| `nzi` | Nzema |
-| `sna` | Shona |
-| `swa` | Swahili |
-| `tem` | Temne |
-| `twi` | Twi |
-| `wlx` | Wali |
-| `wol` | Wolof |
-| `yor` | Yoruba |
-
-</details>
-
-<details>
-<summary><strong>TTS languages</strong> — 32 languages</summary>
-
-| Code | Language |
-|------|----------|
-| `atw` | Akuapem Twi |
-| `twi` | Asante Twi |
-| `dga` | Dagaare |
-| `dag` | Dagbani |
-| `ada` | Dangme |
-| `eng` | English |
-| `ewe` | Ewe |
-| `fat` | Fante |
-| `fra` | French |
-| `gaa` | Ga |
-| `gjn` | Gonja |
-| `gur` | Gurene |
-| `hau` | Hausa |
-| `ibo` | Igbo |
-| `xsm` | Kasem |
-| `kik` | Kikuyu |
-| `lxn` | Konkomba (Likoonli) |
-| `xon` | Konkomba (Likpakpaanl) |
-| `kri` | Krio |
-| `kus` | Kusaal |
-| `luo` | Luo |
-| `maw` | Mampruli |
-| `men` | Mende |
-| `mer` | Meru/Kimeru |
-| `nzi` | Nzema |
-| `pcm` | Pidgin |
-| `sna` | Shona |
-| `swa` | Swahili |
-| `tem` | Temne |
-| `wlx` | Wali |
-| `wol` | Wolof |
-| `yor` | Yoruba |
-
-</details>
+The SDK does not validate language codes — it sends what you pass and lets the
+API decide, so you can use any code the API supports without waiting for an SDK
+release.
 
 ## Configuration
 

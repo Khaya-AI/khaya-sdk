@@ -34,40 +34,8 @@ with KhayaClient(api_key) as khaya:
 
 ## Supported languages
 
-| Code | Language |
-|------|----------|
-| `atw` | Akuapem Twi |
-| `twi` | Asante Twi |
-| `dga` | Dagaare |
-| `dag` | Dagbani |
-| `ada` | Dangme |
-| `eng` | English |
-| `ewe` | Ewe |
-| `fat` | Fante |
-| `fra` | French |
-| `gaa` | Ga |
-| `gjn` | Gonja |
-| `gur` | Gurene |
-| `hau` | Hausa |
-| `ibo` | Igbo |
-| `xsm` | Kasem |
-| `kik` | Kikuyu |
-| `lxn` | Konkomba (Likoonli) |
-| `xon` | Konkomba (Likpakpaanl) |
-| `kri` | Krio |
-| `kus` | Kusaal |
-| `luo` | Luo |
-| `maw` | Mampruli |
-| `men` | Mende |
-| `mer` | Meru/Kimeru |
-| `nzi` | Nzema |
-| `pcm` | Pidgin |
-| `sna` | Shona |
-| `swa` | Swahili |
-| `tem` | Temne |
-| `wlx` | Wali |
-| `wol` | Wolof |
-| `yor` | Yoruba |
+32 languages — see the [language reference](../languages.md#tts-languages).
+TTS codes differ from ASR codes for some languages.
 
 ## Speaker voices
 

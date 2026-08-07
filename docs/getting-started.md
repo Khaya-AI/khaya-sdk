@@ -22,7 +22,15 @@ Sign up at [https://translation.ghananlp.org](https://translation.ghananlp.org) 
 
 ## Authentication
 
-Pass your key directly to the client, or set the `KHAYA_API_KEY` environment variable and pass it from there:
+`KhayaClient` takes the key as its first argument:
+
+```python
+from khaya import KhayaClient
+
+client = KhayaClient("your_api_key_here")
+```
+
+Most people keep it in the environment and pass it from there:
 
 ```bash
 export KHAYA_API_KEY=your_api_key_here
@@ -34,6 +42,11 @@ from khaya import KhayaClient
 
 client = KhayaClient(os.environ["KHAYA_API_KEY"])
 ```
+
+`Settings` reads `KHAYA_`-prefixed variables on its own — `KHAYA_API_KEY`,
+`KHAYA_BASE_URL`, `KHAYA_TIMEOUT`, `KHAYA_RETRY_ATTEMPTS` — which is useful for
+tuning timeouts and retries without touching code. See
+[Configuration](guides/configuration.md).
 
 ## Your first requests
 
@@ -60,10 +73,11 @@ with KhayaClient(os.environ["KHAYA_API_KEY"]) as khaya:
 
 ```python
 with KhayaClient(os.environ["KHAYA_API_KEY"]) as khaya:
-    result = khaya.synthesize("Maakye", "tw")
-    with open("output.wav", "wb") as f:
-        f.write(result.audio)
+    result = khaya.synthesize("Maakye", "twi")
+    result.save("output.wav")
 ```
+
+Pass `speaker="female"`, `"male_low"` or `"male_high"` to choose a voice.
 
 ## Using the context manager
 
@@ -85,3 +99,4 @@ If you manage the lifecycle yourself, call `khaya.http_client.close()`, or
 - [TTS guide](guides/tts.md) — saving and playing audio
 - [Error handling](guides/error-handling.md) — catch the right exception
 - [Async usage](guides/async.md) — `async with` and `await`
+- [Language reference](languages.md) — every code for all three services

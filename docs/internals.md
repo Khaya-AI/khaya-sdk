@@ -36,6 +36,7 @@ The public entry point. Holds one instance of each service and delegates every m
 - **Input validation** — raises a service-specific exception (`TranslationError`, etc.) before any HTTP call is made
 - **No language validation** — language codes are passed through untouched. The API accepts multiple spellings per language and adds languages independently of SDK releases, so client-side checking produced false rejections of valid calls. The API is the authority; unsupported codes come back as an `APIError` with a `VALIDATION_FAILED` code.
 - **Payload construction** — a JSON body for translation and TTS; ASR posts the raw audio bytes with the language as a query parameter
+- **Response validation** — TTS checks the body is audio (content-type or `RIFF` magic) before returning it, and rejects an unknown `speaker` before sending. Translation and ASR decode JSON, raising `APIError` on a non-JSON 2xx
 - **Authentication guard** — the `@check_authentication` decorator raises `AuthenticationError` immediately if no API key is configured
 
 ### BaseApi
@@ -43,7 +44,7 @@ The public entry point. Holds one instance of each service and delegates every m
 The HTTP transport layer. Owns the `httpx.Client` (sync) and `httpx.AsyncClient` (async) instances and implements:
 
 - **Retry loop** — up to `config.retry_attempts` attempts on retryable status codes (429, 500, 502, 503, 504) and transport errors
-- **Backoff** — exponential backoff with jitter: `delay = 2^attempt + random(0, 1)` seconds; respects `Retry-After` header on 429 responses
+- **Backoff** — exponential backoff with jitter: `delay = 2^attempt + random(0, 1)` seconds, capped at 60s; a `Retry-After` header takes precedence and is capped the same way
 - **Exception mapping** — converts HTTP error responses to the appropriate `APIError` subclass
 - **Logging** — emits `DEBUG` on every attempt and successful response; `WARNING` on retries and transport errors
 
@@ -127,5 +128,26 @@ See the [Logging guide](guides/logging.md) for how to enable and configure SDK l
 | 429 (retries exhausted) | `RateLimitError` |
 | 500, 502, 503, 504 (retries exhausted) | `APIError` |
 | Network / transport failure (retries exhausted) | `APIError` (status_code=0) |
-| Empty text / missing file (before HTTP) | Service-specific exception |
+| 200 with a non-audio body (TTS) | `TTSGenerationError` |
+| 200 with a non-JSON body (translation, ASR) | `APIError` |
+| Empty text / missing file / unknown speaker (before HTTP) | Service-specific exception |
 | Missing API key (before HTTP) | `AuthenticationError` |
+
+## API versions
+
+The Khaya API versions each service independently. The SDK currently calls v1
+of all three:
+
+| Service | SDK calls | Also available |
+|---------|-----------|----------------|
+| Translation | `/v1/translate` | `/v2/translate` — same response shape |
+| ASR | `/asr/v1/transcribe` | `/asr/v2/`, `/asr/v3/` — structured body with `warnings`, word/segment timing, long-form audio |
+| TTS | `/tts/v1/tts` | `/tts/v2/synthesize` |
+
+v1 returns a bare string from ASR, so the SDK cannot currently surface the
+`warnings` newer versions emit — including the notice that legacy language
+codes are deprecated in favour of ISO 639-3. See the
+[language reference](languages.md#language-codes-legacy-and-iso-639-3).
+
+Only `/asr/v1/languages` has no catalogue endpoint; `SUPPORTED_ASR_LANGUAGES`
+is therefore generated from `/asr/v3/languages`, whose codes v1 also accepts.
