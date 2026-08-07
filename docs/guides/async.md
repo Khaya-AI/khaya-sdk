@@ -49,7 +49,7 @@ async def process(api_key: str, text: str, audio_path: str):
     async with KhayaClient(api_key) as khaya:
         translation, transcript = await asyncio.gather(
             khaya.atranslate(text, "en-tw"),
-            khaya.atranscribe(audio_path, "tw"),
+            khaya.atranscribe(audio_path, "twi"),
         )
     return translation.text, transcript.text
 ```

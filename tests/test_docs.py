@@ -92,10 +92,14 @@ def test_languages_page_matches_constants(heading, expected):
 
 
 def test_guides_link_to_the_languages_page_rather_than_copying_it():
-    """A second copy of a table is a second thing to forget to update."""
+    """A second copy of a table is a second thing to forget to update.
+
+    Detects the table itself, not passing mentions of a code in prose.
+    """
+    signatures = ("| Code | Language |", "| Pair | Direction |")
     for doc in DOC_FILES:
         if doc.name == "languages.md":
             continue
         text = doc.read_text()
-        for code in ("xon_likpakpaanl", "xon_likoonli"):
-            assert code not in text, f"{doc.name} carries a copy of a language table"
+        for signature in signatures:
+            assert signature not in text, f"{doc.name} carries a copy of a language table"

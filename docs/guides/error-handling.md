@@ -98,7 +98,7 @@ client.translate("Hello", "en-tw")  # raises AuthenticationError
 
 ```python
 try:
-    khaya.transcribe("missing.wav", "tw")
+    khaya.transcribe("missing.wav", "twi")
 except ASRTranscriptionError as e:
     print(e.message)  # "Audio file not found: missing.wav"
 ```

@@ -51,7 +51,7 @@ with KhayaClient(os.environ["KHAYA_API_KEY"]) as khaya:
     print(result.text)
 
     # Transcribe a Twi audio file
-    result = khaya.transcribe("path/to/audio.wav", "tw")
+    result = khaya.transcribe("path/to/audio.wav", "twi")
     print(result.text)
 
     # Synthesize speech in Twi, optionally choosing a voice
@@ -75,7 +75,7 @@ async def main():
         result = await khaya.atranslate("Hello", "en-tw")
         print(result.text)
 
-        result = await khaya.atranscribe("path/to/audio.wav", "tw")
+        result = await khaya.atranscribe("path/to/audio.wav", "twi")
         print(result.text)
 
         result = await khaya.asynthesize("Me ho yɛ", "twi")

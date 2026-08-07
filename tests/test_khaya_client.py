@@ -26,7 +26,7 @@ from khaya.models import SynthesisResult, TranscriptionResult, TranslationResult
 BASE_URL = "https://translation-api.ghananlp.org"
 TRANSLATE_URL = f"{BASE_URL}/v1/translate"
 TTS_URL = f"{BASE_URL}/tts/v1/tts"
-ASR_URL = f"{BASE_URL}/asr/v1/transcribe"
+ASR_URL = f"{BASE_URL}/asr/v3/transcribe"
 
 # TTS responses must look like audio or the content-type guard rejects them.
 WAV_BYTES = b"RIFF$\x00\x00\x00WAVEfmt " + b"\x00" * 24
@@ -121,6 +121,102 @@ class TestTranscribe:
         respx_mock.post(ASR_URL).mock(return_value=httpx.Response(500, text="Server Error"))
         with pytest.raises(APIError):
             make_client().transcribe(str(audio), "tw")
+
+    def test_v3_structured_body_populates_text(self, respx_mock, tmp_path):
+        audio = tmp_path / "test.wav"
+        audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+        respx_mock.post(ASR_URL).mock(return_value=httpx.Response(200, json={"text": "Me ho yɛ."}))
+        result = make_client().transcribe(str(audio), "twi")
+        assert result.text == "Me ho yɛ."
+        assert result.warnings == []
+        assert result.timings is None
+
+    def test_api_warnings_are_surfaced(self, respx_mock, tmp_path):
+        audio = tmp_path / "test.wav"
+        audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+        respx_mock.post(ASR_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={"text": "Me ho yɛ.", "warnings": ["'tw' is a legacy code."]},
+            )
+        )
+        result = make_client().transcribe(str(audio), "tw")
+        assert result.warnings == ["'tw' is a legacy code."]
+
+    def test_v1_bare_string_still_parses(self, respx_mock, tmp_path):
+        """asr_version="v1" returns a bare JSON string, carrying no envelope."""
+        audio = tmp_path / "test.wav"
+        audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+        config = Settings(api_key="k", retry_attempts=1, asr_version="v1")
+        respx_mock.post(f"{BASE_URL}/asr/v1/transcribe").mock(
+            return_value=httpx.Response(200, json="Me ho yɛ.")
+        )
+        result = KhayaClient(api_key="k", config=config).transcribe(str(audio), "twi")
+        assert result.text == "Me ho yɛ."
+        assert result.warnings == []
+
+    def test_word_timings_are_parsed(self, respx_mock, tmp_path):
+        audio = tmp_path / "test.wav"
+        audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+        route = respx_mock.post(ASR_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "text": "Me ho",
+                    "timings": {
+                        "unit": "seconds",
+                        "granularity": "word",
+                        "segments": [],
+                        "words": [
+                            {"word": "Me", "start": 0.0, "end": 0.12},
+                            {"word": "ho", "start": 0.12, "end": 0.30},
+                        ],
+                    },
+                },
+            )
+        )
+        result = make_client().transcribe(str(audio), "twi", timestamps="word")
+        assert route.calls.last.request.url.params["timestamps"] == "word"
+        assert result.timings is not None
+        assert result.timings.granularity == "word"
+        assert [w.word for w in result.timings.words] == ["Me", "ho"]
+        assert result.timings.words[0].end == 0.12
+
+    def test_segment_timings_are_parsed(self, respx_mock, tmp_path):
+        audio = tmp_path / "test.wav"
+        audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+        respx_mock.post(ASR_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "text": "Me ho yɛ.",
+                    "timings": {
+                        "unit": "seconds",
+                        "granularity": "segment",
+                        "words": [],
+                        "segments": [{"text": "Me ho yɛ.", "start": 0.0, "end": 1.0}],
+                    },
+                },
+            )
+        )
+        result = make_client().transcribe(str(audio), "twi", timestamps="segment")
+        assert result.timings.segments[0].text == "Me ho yɛ."
+        assert result.timings.segments[0].end == 1.0
+
+    def test_timestamps_omitted_from_params_when_unset(self, respx_mock, tmp_path):
+        audio = tmp_path / "test.wav"
+        audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+        route = respx_mock.post(ASR_URL).mock(return_value=httpx.Response(200, json={"text": "hi"}))
+        make_client().transcribe(str(audio), "twi")
+        assert "timestamps" not in route.calls.last.request.url.params
+
+    def test_invalid_timestamps_rejected_before_request(self, respx_mock, tmp_path):
+        audio = tmp_path / "test.wav"
+        audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+        route = respx_mock.post(ASR_URL)
+        with pytest.raises(ASRTranscriptionError, match="word.*segment"):
+            make_client().transcribe(str(audio), "twi", timestamps="true")
+        assert route.call_count == 0
 
     def test_language_sent_as_query_param(self, respx_mock, tmp_path):
         audio = tmp_path / "test.wav"

@@ -10,6 +10,7 @@
 | `base_url` | `https://translation-api.ghananlp.org` | API base URL |
 | `timeout` | `30` | Request timeout in seconds |
 | `retry_attempts` | `3` | Number of attempts on transient failures |
+| `asr_version` | `v3` | ASR API version — `v1`, `v2` or `v3` |
 
 ## Environment variables
 
@@ -21,6 +22,7 @@ Every setting can come from a `KHAYA_`-prefixed environment variable:
 | `KHAYA_BASE_URL` | `base_url` |
 | `KHAYA_TIMEOUT` | `timeout` |
 | `KHAYA_RETRY_ATTEMPTS` | `retry_attempts` |
+| `KHAYA_ASR_VERSION` | `asr_version` |
 
 ```python
 import os

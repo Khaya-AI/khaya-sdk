@@ -16,7 +16,14 @@ from .exceptions import (
     TTSGenerationError,
 )
 from .khaya_client import KhayaClient
-from .models import SynthesisResult, TranscriptionResult, TranslationResult
+from .models import (
+    SegmentTiming,
+    SynthesisResult,
+    Timings,
+    TranscriptionResult,
+    TranslationResult,
+    WordTiming,
+)
 
 __version__ = version("khaya")
 
@@ -30,6 +37,9 @@ __all__ = [
     "TranslationResult",
     "TranscriptionResult",
     "SynthesisResult",
+    "Timings",
+    "WordTiming",
+    "SegmentTiming",
     # Exceptions
     "APIError",
     "AuthenticationError",

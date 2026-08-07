@@ -29,8 +29,8 @@ with KhayaClient(api_key) as khaya:
 | `save(path)` | method | Write audio to a file |
 
 !!! note
-    TTS language codes differ from ASR codes for the same language.
-    For example, Asante Twi is `"tw"` in ASR but `"twi"` in TTS.
+    Most codes are shared with ASR, but not all: Konkomba (Likpakpaanl) is
+    `"xon_likpakpaanl"` for ASR and `"xon"` for TTS.
 
 ## Supported languages
 
