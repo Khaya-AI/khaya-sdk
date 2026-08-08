@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.3.0] — 2026-08-08
+
+Two features: an MCP server that puts Khaya inside AI clients, and per-service
+API version selection. No breaking changes — `transcribe()` gains optional
+arguments and result fields, everything else is additive.
+
 ### Added
 
 - **MCP server** — `pip install khaya[mcp]` provides a `khaya-mcp` console
