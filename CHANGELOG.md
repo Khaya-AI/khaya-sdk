@@ -15,6 +15,19 @@ Two features: an MCP server that puts Khaya inside AI clients, and per-service
 API version selection. No breaking changes — `transcribe()` gains optional
 arguments and result fields, everything else is additive.
 
+### Fixed
+
+- **The TTS `speaker` parameter does not change the voice, and the docs said
+  it did.** 0.2.0 shipped a table describing `male_low`, `male_high` and
+  `female` as different pitches; nobody verified it. Measured 2026-08-09,
+  synthesising the same text with each speaker — and with the parameter
+  omitted — yields the same voice: ~148 Hz median pitch for all four cases in
+  Twi, and a 1–4 Hz gap between `female` and `male_low` in English, Ewe and
+  Hausa, smaller than the run-to-run variation of a single speaker. Both
+  `/tts/v1` and `/tts/v2` behave this way. The voice does vary by language, so
+  the parameter is kept — the API publishes and accepts it, and may honour it
+  later — but the documentation no longer claims an effect it does not have.
+
 ### Added
 
 - **MCP server** — `pip install khaya[mcp]` provides a `khaya-mcp` console

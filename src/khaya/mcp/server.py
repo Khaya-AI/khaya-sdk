@@ -117,9 +117,10 @@ def build_server(client: KhayaClient | None = None) -> MCPServer:
     ) -> str:
         """Generate speech from text and write it to a .wav file.
 
-        language is ISO 639-3, e.g. "twi". speaker is one of "male_low",
-        "male_high" or "female"; omit it for the default voice. Returns the
-        path written — the audio is not returned inline.
+        language is ISO 639-3, e.g. "twi". speaker accepts "male_low",
+        "male_high" or "female", but the API currently returns the same voice
+        for all three, so there is no point offering the user a choice.
+        Returns the path written — the audio is not returned inline.
         """
         result = await khaya.asynthesize(text, language, speaker)
         result.save(output_path)

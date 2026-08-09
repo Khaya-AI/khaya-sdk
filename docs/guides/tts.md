@@ -39,6 +39,52 @@ TTS codes differ from ASR codes for some languages.
 
 ## Speaker voices
 
+`/tts/v1/speakers` publishes three values, and `synthesize()` forwards
+whichever you pass:
+
+| Speaker |
+|---------|
+| `male_low` |
+| `male_high` |
+| `female` |
+
+!!! warning "The API currently ignores this"
+    Measured 2026-08-09: synthesising the same text with each speaker, and
+    with the parameter omitted, produces the same voice. Median pitch was
+    ~148 Hz for all four cases in Twi, and the difference between `female`
+    and `male_low` was 1–4 Hz in English, Ewe and Hausa — smaller than the
+    variation between two runs of the *same* speaker. Both `/tts/v1` and
+    `/tts/v2` behave this way.
+
+    The voice does vary by **language** (Ewe sits far above English), so
+    there is more than one voice in the system — it just is not selectable
+    yet. The parameter is kept because the API publishes and accepts it, and
+    may honour it later.
+
+```python
+with KhayaClient(api_key) as khaya:
+    result = khaya.synthesize("Maakye", "twi", speaker="female")
+    result.save("output.wav")
+```
+
+An unrecognised speaker is rejected before the request is sent:
+
+```python
+khaya.synthesize("Maakye", "twi", speaker="robot")
+# TTSGenerationError: Unknown speaker 'robot'. Supported speakers: female, male_high, male_low
+```
+
+The check guards against values absent from the API's own catalogue, so your
+code is already correct if the parameter starts working.
+`khaya.constants.SUPPORTED_TTS_SPEAKERS` holds the accepted values.
+
+## Supported languages
+
+32 languages — see the [language reference](../languages.md#tts-languages).
+TTS codes differ from ASR codes for some languages.
+
+## Speaker voices
+
 All languages share the same multilingual speaker pool. Pass a `speaker` to control the voice:
 
 | Speaker | Description |
