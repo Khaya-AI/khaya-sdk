@@ -250,19 +250,19 @@ class TestSynthesize:
         result.save(str(out))
         assert out.read_bytes() == WAV_BYTES
 
-    def test_speaker_is_sent_in_payload(self, respx_mock):
+    def test_speaker_is_sent_as_speaker_id(self, respx_mock):
         route = respx_mock.post(TTS_URL).mock(
             return_value=httpx.Response(200, content=WAV_BYTES, headers=AUDIO_HEADERS)
         )
         make_client().synthesize("Hello", "twi", speaker="female")
-        assert json.loads(route.calls.last.request.content)["speaker"] == "female"
+        assert json.loads(route.calls.last.request.content)["speaker_id"] == "female"
 
     def test_speaker_omitted_from_payload_when_none(self, respx_mock):
         route = respx_mock.post(TTS_URL).mock(
             return_value=httpx.Response(200, content=WAV_BYTES, headers=AUDIO_HEADERS)
         )
         make_client().synthesize("Hello", "twi")
-        assert "speaker" not in json.loads(route.calls.last.request.content)
+        assert "speaker_id" not in json.loads(route.calls.last.request.content)
 
     @pytest.mark.parametrize("speaker", ["male_low", "male_high", "female"])
     def test_every_supported_speaker_is_accepted(self, respx_mock, speaker):

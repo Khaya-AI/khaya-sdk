@@ -17,16 +17,19 @@ arguments and result fields, everything else is additive.
 
 ### Fixed
 
-- **The TTS `speaker` parameter does not change the voice, and the docs said
-  it did.** 0.2.0 shipped a table describing `male_low`, `male_high` and
-  `female` as different pitches; nobody verified it. Measured 2026-08-09,
-  synthesising the same text with each speaker — and with the parameter
-  omitted — yields the same voice: ~148 Hz median pitch for all four cases in
-  Twi, and a 1–4 Hz gap between `female` and `male_low` in English, Ewe and
-  Hausa, smaller than the run-to-run variation of a single speaker. Both
-  `/tts/v1` and `/tts/v2` behave this way. The voice does vary by language, so
-  the parameter is kept — the API publishes and accepts it, and may honour it
-  later — but the documentation no longer claims an effect it does not have.
+- **TTS `speaker` never reached the API.** The wire field is `speaker_id`; the
+  SDK sent `speaker`, which the API silently drops — no error, no change of
+  voice. Every call since the parameter shipped in 0.2.0 used the default
+  voice regardless of what was passed. Corrected, and confirmed acoustically:
+  `female` now measures ~203 Hz median pitch against ~150 Hz for `male_low`
+  in Twi, where previously all values produced ~148 Hz.
+
+  This was invisible for two reasons worth recording. The API ignores unknown
+  body fields rather than rejecting them, so `speaker="robot"` returned 200.
+  And the SDK validated the speaker client-side, so no request ever reached
+  the API's own `INVALID_SPEAKER` check that would have exposed the wrong
+  field name. An integration test now asserts the API validates
+  `speaker_id`, which only passes if the SDK sends the key the API reads.
 
 ### Added
 
