@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.3.0] — 2026-08-08
+
+Two features: an MCP server that puts Khaya inside AI clients, and per-service
+API version selection. No breaking changes — `transcribe()` gains optional
+arguments and result fields, everything else is additive.
+
+### Fixed
+
+- Whitespace-only text is rejected before the request. The API bills it and
+  returns invented speech — `translate("  ", "eng-twi")` produced a paragraph
+  of unrelated Twi.
+- `SynthesisResult.save()` raised a bare `[Errno 2] No such file or directory`
+  when the destination directory was missing. It now raises
+  `TTSGenerationError` naming the missing directory.
+- The MCP `transcribe` and `synthesize` tool descriptions now state that paths
+  must be absolute. The server runs with its own working directory, so a
+  relative path from the user's project does not resolve.
+- **TTS `speaker` never reached the API.** The wire field is `speaker_id`; the
+  SDK sent `speaker`, which the API silently drops — no error, no change of
+  voice. Every call since the parameter shipped in 0.2.0 used the default
+  voice regardless of what was passed. Corrected, and confirmed acoustically:
+  `female` now measures ~203 Hz median pitch against ~150 Hz for `male_low`
+  in Twi, where previously all values produced ~148 Hz.
+
+  This was invisible for two reasons worth recording. The API ignores unknown
+  body fields rather than rejecting them, so `speaker="robot"` returned 200.
+  And the SDK validated the speaker client-side, so no request ever reached
+  the API's own `INVALID_SPEAKER` check that would have exposed the wrong
+  field name. An integration test now asserts the API validates
+  `speaker_id`, which only passes if the SDK sends the key the API reads.
+
 ### Added
 
 - **MCP server** — `pip install khaya[mcp]` provides a `khaya-mcp` console

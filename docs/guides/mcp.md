@@ -35,6 +35,46 @@ the config file differs. Restart the client afterwards.
 If `KHAYA_API_KEY` is missing the server exits immediately with a message,
 rather than failing on the first tool call.
 
+## Verifying it works
+
+**Restart your client after adding the server.** Configuration is read at
+startup, so a running session will not pick it up — this is the most common
+reason a freshly added server does not appear.
+
+Three checks, cheapest first.
+
+**1. Does it start?**
+
+```bash
+claude mcp list
+# khaya: khaya-mcp  - ✔ Connected
+```
+
+**2. Does it speak the protocol?** No client library needed — pipe JSON-RPC
+straight in:
+
+```bash
+{ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"smoke","version":"0"}}}'
+  printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+  printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+  sleep 3
+} | khaya-mcp
+```
+
+You should see the four tool definitions in the response to id 2.
+
+**3. Interactively.** The official inspector gives a browser UI for calling
+tools by hand:
+
+```bash
+npx @modelcontextprotocol/inspector khaya-mcp
+```
+
+Set `KHAYA_API_KEY` in your environment first.
+
+**In the client**, ask for something only the server can do — "which languages
+can Khaya transcribe?" — and confirm you see a tool call rather than a guess.
+
 ## Tools
 
 | Tool | Purpose |

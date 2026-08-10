@@ -53,6 +53,10 @@ class TestTranslate:
         assert result.source_language == "en"
         assert result.target_language == "tw"
 
+    def test_whitespace_only_text_rejected(self):
+        with pytest.raises(TranslationError):
+            make_client().translate("   ", "eng-twi")
+
     def test_empty_text_raises_translation_error(self):
         with pytest.raises(TranslationError):
             make_client().translate("", "en-tw")
@@ -250,19 +254,19 @@ class TestSynthesize:
         result.save(str(out))
         assert out.read_bytes() == WAV_BYTES
 
-    def test_speaker_is_sent_in_payload(self, respx_mock):
+    def test_speaker_is_sent_as_speaker_id(self, respx_mock):
         route = respx_mock.post(TTS_URL).mock(
             return_value=httpx.Response(200, content=WAV_BYTES, headers=AUDIO_HEADERS)
         )
         make_client().synthesize("Hello", "twi", speaker="female")
-        assert json.loads(route.calls.last.request.content)["speaker"] == "female"
+        assert json.loads(route.calls.last.request.content)["speaker_id"] == "female"
 
     def test_speaker_omitted_from_payload_when_none(self, respx_mock):
         route = respx_mock.post(TTS_URL).mock(
             return_value=httpx.Response(200, content=WAV_BYTES, headers=AUDIO_HEADERS)
         )
         make_client().synthesize("Hello", "twi")
-        assert "speaker" not in json.loads(route.calls.last.request.content)
+        assert "speaker_id" not in json.loads(route.calls.last.request.content)
 
     @pytest.mark.parametrize("speaker", ["male_low", "male_high", "female"])
     def test_every_supported_speaker_is_accepted(self, respx_mock, speaker):
@@ -292,6 +296,20 @@ class TestSynthesize:
     def test_audio_without_content_type_is_accepted_on_riff_magic(self, respx_mock):
         respx_mock.post(TTS_URL).mock(return_value=httpx.Response(200, content=WAV_BYTES))
         assert make_client().synthesize("Hello", "twi").audio == WAV_BYTES
+
+    def test_whitespace_only_text_rejected(self):
+        """The API bills whitespace and returns invented speech."""
+        with pytest.raises(TTSGenerationError):
+            make_client().synthesize("   \n\t ", "twi")
+
+    def test_save_names_the_missing_directory(self, respx_mock, tmp_path):
+        respx_mock.post(TTS_URL).mock(
+            return_value=httpx.Response(200, content=WAV_BYTES, headers=AUDIO_HEADERS)
+        )
+        result = make_client().synthesize("Me ho yɛ", "twi")
+        missing = tmp_path / "nope" / "out.wav"
+        with pytest.raises(TTSGenerationError, match="no such directory"):
+            result.save(str(missing))
 
     def test_empty_text_raises_tts_error(self):
         with pytest.raises(TTSGenerationError):

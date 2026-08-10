@@ -150,6 +150,24 @@ def test_every_documented_speaker_synthesizes(integration_client, speaker):
 
 
 @pytest.mark.integration
+def test_speaker_reaches_the_api_under_the_field_it_reads(integration_client):
+    """The wire field is speaker_id; "speaker" is silently ignored.
+
+    Sending the wrong key produced no error and no voice change, so nothing
+    caught it. This asserts the API validates what we send — which it only
+    does for the field it actually reads.
+    """
+    with pytest.raises(APIError) as exc:
+        integration_client.tts.http_client.request(
+            "POST",
+            integration_client.config.endpoints["tts"],
+            json={"text": "Me ho yɛ", "language": "twi", "speaker_id": "not_a_speaker"},
+        )
+    assert exc.value.code == "VALIDATION_FAILED"
+    assert any(d.get("target") == "speaker_id" for d in exc.value.details)
+
+
+@pytest.mark.integration
 def test_unknown_speaker_is_rejected_client_side(integration_client):
     """The API accepts any speaker string; this asserts the SDK does not."""
     with pytest.raises(TTSGenerationError, match="Unknown speaker"):

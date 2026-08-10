@@ -16,10 +16,11 @@ _WAV_MAGIC = b"RIFF"
 
 
 def _build_payload(text: str, language: str, speaker: str | None) -> dict:
-    if not text or not language:
+    # .strip(): whitespace-only text is billed and returns invented speech.
+    if not text.strip() or not language:
         raise TTSGenerationError("Text and language are required", 400)
-    # The API substitutes its default voice for an unknown speaker instead of
-    # erroring, so a typo is otherwise invisible.
+    # Checked client-side to fail fast without a round trip; the API also
+    # validates, returning INVALID_SPEAKER naming the accepted values.
     if speaker is not None and speaker not in SUPPORTED_TTS_SPEAKERS:
         raise TTSGenerationError(
             f"Unknown speaker {speaker!r}. Supported speakers: "
@@ -28,7 +29,9 @@ def _build_payload(text: str, language: str, speaker: str | None) -> dict:
         )
     payload: dict = {"text": text, "language": language}
     if speaker is not None:
-        payload["speaker"] = speaker
+        # The wire field is speaker_id. Sending "speaker" is silently dropped:
+        # the voice never changes and no error is raised.
+        payload["speaker_id"] = speaker
     return payload
 
 
