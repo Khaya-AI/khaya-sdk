@@ -94,7 +94,9 @@ def build_server(client: KhayaClient | None = None) -> MCPServer:
     ) -> dict[str, Any]:
         """Transcribe a .wav audio file to text.
 
-        audio_path is a path on this machine. language is the spoken language,
+        audio_path must be an ABSOLUTE path — this server runs with its own
+        working directory, so relative paths will not resolve. language is the
+        spoken language,
         ISO 639-3, e.g. "twi". Set timestamps to "word" or "segment" to also
         get start/end offsets in seconds.
 
@@ -117,6 +119,8 @@ def build_server(client: KhayaClient | None = None) -> MCPServer:
     ) -> str:
         """Generate speech from text and write it to a .wav file.
 
+        output_path must be an ABSOLUTE path in an existing directory — this
+        server runs with its own working directory.
         language is ISO 639-3, e.g. "twi". speaker selects a voice:
         "female" is noticeably higher pitched than "male_low" or "male_high".
         Omit it for the API default. Returns the path written — the audio is

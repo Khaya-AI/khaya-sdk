@@ -39,7 +39,7 @@ class TranslationService:
             APIError: On HTTP errors from the API, including an unsupported
                 language pair.
         """
-        if not text or not language_pair:
+        if not text.strip() or not language_pair:
             raise TranslationError("Text and language pair are required", 400)
         source, target = _parse_language_pair(language_pair)
         logger.debug("Translating %d chars (%s)", len(text), language_pair)
@@ -53,7 +53,7 @@ class TranslationService:
     @check_authentication
     async def atranslate(self, text: str, language_pair: str = "en-tw") -> TranslationResult:
         """Async version of translate."""
-        if not text or not language_pair:
+        if not text.strip() or not language_pair:
             raise TranslationError("Text and language pair are required", 400)
         source, target = _parse_language_pair(language_pair)
         logger.debug("Translating %d chars (%s)", len(text), language_pair)

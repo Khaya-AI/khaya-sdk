@@ -1,4 +1,7 @@
+import os
 from dataclasses import dataclass, field
+
+from khaya.exceptions import TTSGenerationError
 
 
 @dataclass
@@ -101,7 +104,16 @@ class SynthesisResult:
         """Write the audio bytes to a file.
 
         Args:
-            path: Destination file path (e.g. ``"output.wav"``).
+            path: Destination file path (e.g. ``"output.wav"``). The parent
+                directory must exist.
+
+        Raises:
+            TTSGenerationError: If the destination cannot be written.
         """
-        with open(path, "wb") as f:
-            f.write(self.audio)
+        try:
+            with open(path, "wb") as f:
+                f.write(self.audio)
+        except OSError as e:
+            parent = os.path.dirname(os.path.abspath(path))
+            hint = "" if os.path.isdir(parent) else f" (no such directory: {parent})"
+            raise TTSGenerationError(f"Could not write audio to {path!r}{hint}", 400) from e

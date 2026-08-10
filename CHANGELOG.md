@@ -17,6 +17,15 @@ arguments and result fields, everything else is additive.
 
 ### Fixed
 
+- Whitespace-only text is rejected before the request. The API bills it and
+  returns invented speech — `translate("  ", "eng-twi")` produced a paragraph
+  of unrelated Twi.
+- `SynthesisResult.save()` raised a bare `[Errno 2] No such file or directory`
+  when the destination directory was missing. It now raises
+  `TTSGenerationError` naming the missing directory.
+- The MCP `transcribe` and `synthesize` tool descriptions now state that paths
+  must be absolute. The server runs with its own working directory, so a
+  relative path from the user's project does not resolve.
 - **TTS `speaker` never reached the API.** The wire field is `speaker_id`; the
   SDK sent `speaker`, which the API silently drops — no error, no change of
   voice. Every call since the parameter shipped in 0.2.0 used the default

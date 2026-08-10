@@ -16,7 +16,8 @@ _WAV_MAGIC = b"RIFF"
 
 
 def _build_payload(text: str, language: str, speaker: str | None) -> dict:
-    if not text or not language:
+    # .strip(): whitespace-only text is billed and returns invented speech.
+    if not text.strip() or not language:
         raise TTSGenerationError("Text and language are required", 400)
     # Checked client-side to fail fast without a round trip; the API also
     # validates, returning INVALID_SPEAKER naming the accepted values.
