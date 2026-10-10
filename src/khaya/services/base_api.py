@@ -192,9 +192,10 @@ class BaseApi:
         self.close()
 
     def _prepare_headers(self) -> dict[str, str]:
+        # No Content-Type here: httpx sets application/json for ``json=`` bodies,
+        # and binary uploads must declare their own type.
         return {
-            "Ocp-Apim-Subscription-Key": self.config.api_key or "",
-            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.config.api_key or ''}",
             "Cache-Control": "no-cache",
         }
 
@@ -234,8 +235,7 @@ class BaseApi:
             RateLimitError: On 429 after all retries exhausted.
             APIError: On other HTTP errors or transport failures.
         """
-        headers = self._prepare_headers()
-        kwargs.setdefault("headers", headers)
+        kwargs["headers"] = {**self._prepare_headers(), **kwargs.get("headers", {})}
         last_exc: APIError | None = None
         total = self.config.retry_attempts
 
@@ -300,8 +300,7 @@ class BaseApi:
             RateLimitError: On 429 after all retries exhausted.
             APIError: On other HTTP errors or transport failures.
         """
-        headers = self._prepare_headers()
-        kwargs.setdefault("headers", headers)
+        kwargs["headers"] = {**self._prepare_headers(), **kwargs.get("headers", {})}
         last_exc: APIError | None = None
         total = self.config.retry_attempts
 

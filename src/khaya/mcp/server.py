@@ -150,10 +150,10 @@ async def _live_catalogue(client: KhayaClient, service: Service) -> set[str]:
     """Fetch a catalogue from the API. Only ASR and TTS publish one."""
     base = client.config.base_url
     if service == "asr":
-        response = await client.http_client.arequest("GET", f"{base}/asr/v3/languages")
+        response = await client.http_client.arequest("GET", f"{base}/asr/v1/languages")
         return {entry["code"] for entry in response.json()["languages"]}
     if service == "tts":
-        response = await client.http_client.arequest("GET", f"{base}/tts/v2/languages")
+        response = await client.http_client.arequest("GET", f"{base}/tts/v1/languages")
         return set(response.json()["languages"].values())
     # Translation publishes single codes, not the pairs the API actually takes.
     return set(_CATALOGUES["translation"])

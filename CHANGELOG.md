@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Moves the SDK to the new Khaya platform. This is a breaking release (0.4.0):
+the old Azure APIM host and `Ocp-Apim-Subscription-Key` auth no longer work
+with it.
+
+### Changed (breaking)
+
+- The default `base_url` is `https://api.khaya.ai` (was
+  `https://translation-api.ghananlp.org`).
+- The API key is sent as `Authorization: Bearer <key>` (was the
+  `Ocp-Apim-Subscription-Key` header).
+- Routes are now `/translate/v1/translate`, `/asr/v1/transcribe` and
+  `/tts/v1/synthesize`.
+- `Settings.translation_version`, `asr_version` and `tts_version` (and their
+  `KHAYA_*_VERSION` variables) are removed; the platform has a single `v1`.
+  `API_ENDPOINTS` is now a plain `service -> path` mapping, and the
+  `TranslationVersion`, `AsrVersion` and `TtsVersion` types are gone.
+- Language catalogues for the MCP `list_languages` refresh come from
+  `/asr/v1/languages` and `/tts/v1/languages`.
+
+### Fixed
+
+- ASR uploads were sent as `application/json`, which the gateway rejects with
+  `415 UNSUPPORTED_MEDIA_TYPE`. The upload now declares `audio/*` or `video/*`
+  from the file extension, falling back to `application/octet-stream`.
+
+### Migration from 0.3.x
+
+1. Replace any `base_url` override that points at `translation-api.ghananlp.org`
+   (or remove it to use the new default).
+2. Use an API key from the Khaya platform (see https://docs.khaya.ai).
+3. Delete `translation_version`, `asr_version` and `tts_version` from your
+   `Settings(...)` calls and from any `KHAYA_*_VERSION` environment variables.
+
 ---
 
 ## [0.3.0] — 2026-08-08

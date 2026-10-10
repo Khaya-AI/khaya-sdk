@@ -13,7 +13,6 @@ from pathlib import Path
 import pytest
 
 from khaya import KhayaClient
-from khaya.config import Settings
 from khaya.constants import (
     SUPPORTED_ASR_LANGUAGES,
     SUPPORTED_TTS_LANGUAGES,
@@ -175,32 +174,25 @@ def test_unknown_speaker_is_rejected_client_side(integration_client):
 
 
 # ---------------------------------------------------------------------------
-# Endpoint registry — proves every selectable version is a real route, which
-# unit tests cannot: a wrong path is a 404, not a type error.
+# Routes — a wrong path is a 404, not a type error, so unit tests cannot cover it.
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("version", ["v1", "v2"])
-def test_every_translation_version_works(version):
-    config = Settings(api_key=os.environ["KHAYA_API_KEY"], translation_version=version)
-    with KhayaClient(config.api_key, config=config) as client:
+def test_translate_route_works():
+    with KhayaClient(os.environ["KHAYA_API_KEY"]) as client:
         assert client.translate("Good morning", "eng-twi").text.strip()
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("version", ["v1", "v2", "v3"])
-def test_every_asr_version_works(version):
-    config = Settings(api_key=os.environ["KHAYA_API_KEY"], asr_version=version)
-    with KhayaClient(config.api_key, config=config) as client:
+def test_asr_route_works():
+    with KhayaClient(os.environ["KHAYA_API_KEY"]) as client:
         assert client.transcribe(str(AUDIO_FIXTURE), "twi").text.strip()
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("version", ["v1", "v2"])
-def test_every_tts_version_works(version):
-    config = Settings(api_key=os.environ["KHAYA_API_KEY"], tts_version=version)
-    with KhayaClient(config.api_key, config=config) as client:
+def test_tts_route_works():
+    with KhayaClient(os.environ["KHAYA_API_KEY"]) as client:
         assert client.synthesize("Me ho yɛ", "twi").audio[:4] == b"RIFF"
 
 
@@ -216,13 +208,13 @@ def _catalogue(client, path):
 
 @pytest.mark.integration
 def test_asr_language_list_matches_the_live_catalogue(integration_client):
-    live = {entry["code"] for entry in _catalogue(integration_client, "/asr/v3/languages")}
+    live = {entry["code"] for entry in _catalogue(integration_client, "/asr/v1/languages")}
     assert SUPPORTED_ASR_LANGUAGES == live
 
 
 @pytest.mark.integration
 def test_tts_language_list_matches_the_live_catalogue(integration_client):
-    live = set(_catalogue(integration_client, "/tts/v2/languages").values())
+    live = set(_catalogue(integration_client, "/tts/v1/languages").values())
     assert SUPPORTED_TTS_LANGUAGES == live
 
 

@@ -30,7 +30,7 @@ pip install khaya
 
 ## Authentication
 
-Get an API key at [https://translation.ghananlp.org](https://translation.ghananlp.org) and set it as an environment variable:
+Get an API key from [https://docs.khaya.ai](https://docs.khaya.ai) and set it as an environment variable:
 
 ```bash
 export KHAYA_API_KEY=your_api_key_here

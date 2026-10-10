@@ -54,12 +54,6 @@ for word in result.timings.words:
 `text`, `start` and `end`. Offsets are in seconds. Without `timestamps`,
 `result.timings` is `None`.
 
-## API version
-
-The SDK calls ASR v3. v1 returns a bare string and supports neither warnings
-nor timings; pin it with `Settings(asr_version="v1")` if you need the old
-behaviour.
-
 ## Supported languages
 
 34 languages — see the [language reference](../languages.md#asr-languages).

@@ -23,10 +23,10 @@ from khaya.exceptions import (
 )
 from khaya.models import SynthesisResult, TranscriptionResult, TranslationResult
 
-BASE_URL = "https://translation-api.ghananlp.org"
-TRANSLATE_URL = f"{BASE_URL}/v1/translate"
-TTS_URL = f"{BASE_URL}/tts/v1/tts"
-ASR_URL = f"{BASE_URL}/asr/v3/transcribe"
+BASE_URL = "https://api.khaya.ai"
+TRANSLATE_URL = f"{BASE_URL}/translate/v1/translate"
+TTS_URL = f"{BASE_URL}/tts/v1/synthesize"
+ASR_URL = f"{BASE_URL}/asr/v1/transcribe"
 
 # TTS responses must look like audio or the content-type guard rejects them.
 WAV_BYTES = b"RIFF$\x00\x00\x00WAVEfmt " + b"\x00" * 24
@@ -94,6 +94,55 @@ class TestTranslate:
 # ---------------------------------------------------------------------------
 
 
+class TestRequestHeaders:
+    """The platform authenticates with a Bearer token and 415s a wrong upload type."""
+
+    def test_api_key_is_sent_as_a_bearer_token(self, respx_mock):
+        route = respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(200, json="Me ho yɛ")
+        )
+        make_client(api_key="secret-key").translate("How are you", "en-tw")
+        headers = route.calls.last.request.headers
+        assert headers["authorization"] == "Bearer secret-key"
+        assert "ocp-apim-subscription-key" not in headers
+
+    def test_json_requests_still_declare_json(self, respx_mock):
+        route = respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(200, json="Me ho yɛ")
+        )
+        make_client().translate("How are you", "en-tw")
+        assert route.calls.last.request.headers["content-type"] == "application/json"
+
+    @pytest.mark.parametrize(
+        ("filename", "expected"),
+        [
+            ("clip.wav", "audio/"),
+            ("clip.mp3", "audio/"),
+            ("clip.mp4", "video/"),
+            ("clip.unknownext", "application/octet-stream"),
+            ("clip.txt", "application/octet-stream"),
+            ("clip", "application/octet-stream"),
+        ],
+    )
+    def test_asr_upload_declares_a_type_the_gateway_accepts(
+        self, respx_mock, tmp_path, filename, expected
+    ):
+        audio = tmp_path / filename
+        audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+        route = respx_mock.post(ASR_URL).mock(return_value=httpx.Response(200, json="me ho ye"))
+        make_client().transcribe(str(audio), "twi")
+        request = route.calls.last.request
+        assert request.headers["content-type"].startswith(expected)
+        assert request.headers["authorization"] == "Bearer test-api-key"
+
+    async def test_async_asr_upload_declares_a_type_the_gateway_accepts(self, respx_mock, tmp_path):
+        audio = tmp_path / "clip.wav"
+        audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+        route = respx_mock.post(ASR_URL).mock(return_value=httpx.Response(200, json="me ho ye"))
+        await make_client().atranscribe(str(audio), "twi")
+        assert route.calls.last.request.headers["content-type"].startswith("audio/")
+
+
 class TestTranscribe:
     def test_success(self, respx_mock, tmp_path):
         audio = tmp_path / "test.wav"
@@ -148,14 +197,11 @@ class TestTranscribe:
         assert result.warnings == ["'tw' is a legacy code."]
 
     def test_v1_bare_string_still_parses(self, respx_mock, tmp_path):
-        """asr_version="v1" returns a bare JSON string, carrying no envelope."""
+        """A bare JSON string body is still accepted, carrying no envelope."""
         audio = tmp_path / "test.wav"
         audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
-        config = Settings(api_key="k", retry_attempts=1, asr_version="v1")
-        respx_mock.post(f"{BASE_URL}/asr/v1/transcribe").mock(
-            return_value=httpx.Response(200, json="Me ho yɛ.")
-        )
-        result = KhayaClient(api_key="k", config=config).transcribe(str(audio), "twi")
+        respx_mock.post(ASR_URL).mock(return_value=httpx.Response(200, json="Me ho yɛ."))
+        result = make_client().transcribe(str(audio), "twi")
         assert result.text == "Me ho yɛ."
         assert result.warnings == []
 
