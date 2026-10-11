@@ -134,6 +134,24 @@ class TestRequestHeaders:
         assert headers["authorization"] == "Bearer secret-key"
         assert "ocp-apim-subscription-key" not in headers
 
+    def test_no_authorization_header_without_a_key(self, respx_mock):
+        """Unkeyed calls (the public catalogues) must not send an empty Bearer token."""
+        route = respx_mock.get(f"{BASE_URL}/tts/v1/languages").mock(
+            return_value=httpx.Response(200, json={"languages": {}})
+        )
+        make_client(api_key="").http_client.request("GET", f"{BASE_URL}/tts/v1/languages")
+        assert "authorization" not in route.calls.last.request.headers
+
+    def test_explicit_none_headers_are_tolerated(self, respx_mock):
+        route = respx_mock.post(TRANSLATE_URL).mock(return_value=httpx.Response(200, json="x"))
+        make_client().http_client.request("POST", TRANSLATE_URL, json={}, headers=None)
+        assert route.calls.last.request.headers["authorization"] == "Bearer test-api-key"
+
+    async def test_async_explicit_none_headers_are_tolerated(self, respx_mock):
+        route = respx_mock.post(TRANSLATE_URL).mock(return_value=httpx.Response(200, json="x"))
+        await make_client().http_client.arequest("POST", TRANSLATE_URL, json={}, headers=None)
+        assert route.calls.last.request.headers["authorization"] == "Bearer test-api-key"
+
     def test_json_requests_still_declare_json(self, respx_mock):
         route = respx_mock.post(TRANSLATE_URL).mock(
             return_value=httpx.Response(200, json="Me ho yɛ")

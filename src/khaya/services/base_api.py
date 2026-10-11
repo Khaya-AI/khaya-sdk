@@ -243,10 +243,11 @@ class BaseApi:
     def _prepare_headers(self) -> dict[str, str]:
         # No Content-Type here: httpx sets application/json for ``json=`` bodies,
         # and binary uploads must declare their own type.
-        return {
-            "Authorization": f"Bearer {self.config.api_key or ''}",
-            "Cache-Control": "no-cache",
-        }
+        headers = {"Cache-Control": "no-cache"}
+        # Omitted rather than sent as an empty "Bearer " token.
+        if self.config.api_key:
+            headers["Authorization"] = f"Bearer {self.config.api_key}"
+        return headers
 
     def _sync_backoff(self, attempt: int, response: httpx.Response | None = None) -> None:
         delay = _retry_after_delay(response)
@@ -284,7 +285,7 @@ class BaseApi:
             RateLimitError: On 429 after all retries exhausted.
             APIError: On other HTTP errors or transport failures.
         """
-        kwargs["headers"] = {**self._prepare_headers(), **kwargs.get("headers", {})}
+        kwargs["headers"] = {**self._prepare_headers(), **(kwargs.get("headers") or {})}
         last_exc: APIError | None = None
         total = self.config.retry_attempts
 
@@ -349,7 +350,7 @@ class BaseApi:
             RateLimitError: On 429 after all retries exhausted.
             APIError: On other HTTP errors or transport failures.
         """
-        kwargs["headers"] = {**self._prepare_headers(), **kwargs.get("headers", {})}
+        kwargs["headers"] = {**self._prepare_headers(), **(kwargs.get("headers") or {})}
         last_exc: APIError | None = None
         total = self.config.retry_attempts
 
