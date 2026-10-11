@@ -19,6 +19,7 @@ flowchart TD
     H -->|retryable\n429 · 5xx · network| J[Backoff & retry]
     J --> H
     H -->|401| K([AuthenticationError])
+    H -->|402| N([InsufficientCreditsError])
     H -->|429 — retries exhausted| L([RateLimitError])
     H -->|other error| M([APIError])
 ```
@@ -86,6 +87,7 @@ classDiagram
 
     class APIError
     class AuthenticationError
+    class InsufficientCreditsError
     class RateLimitError
     class TranslationError
     class TTSGenerationError
@@ -100,6 +102,7 @@ classDiagram
     TtsService --> BaseApi : uses
 
     APIError <|-- AuthenticationError
+    APIError <|-- InsufficientCreditsError
     APIError <|-- RateLimitError
     APIError <|-- TranslationError
     APIError <|-- TTSGenerationError
@@ -125,6 +128,7 @@ See the [Logging guide](guides/logging.md) for how to enable and configure SDK l
 | HTTP status | Exception raised |
 |-------------|-----------------|
 | 401 | `AuthenticationError` |
+| 402 | `InsufficientCreditsError` (not retried) |
 | 429 (retries exhausted) | `RateLimitError` |
 | 500, 502, 503, 504 (retries exhausted) | `APIError` |
 | Network / transport failure (retries exhausted) | `APIError` (status_code=0) |
@@ -133,32 +137,31 @@ See the [Logging guide](guides/logging.md) for how to enable and configure SDK l
 | Empty text / missing file / unknown speaker (before HTTP) | Service-specific exception |
 | Missing API key (before HTTP) | `AuthenticationError` |
 
-## API versions
+Error bodies are parsed from the platform gateway's envelope,
+`{"detail": {"error", "message", "details", "request_id"}}`, into `code`,
+`message`, `details` and `activity_id`. When `message` is absent the code
+stands in for it, and a 402 builds one from the balance, estimated cost and
+top-up link. The older `{"error": {...}}` and `{"statusCode", "message",
+"activityId"}` envelopes are still read.
 
-The Khaya API versions each service independently. The SDK currently calls v1
-of all three:
+## API version
 
-`Settings` selects a version per service, resolved through the
-`API_ENDPOINTS` registry in `khaya.config`:
+The Khaya platform publishes a single version, `v1`, for every service. The
+routes live in the `API_ENDPOINTS` registry in `khaya.config`, and `Settings`
+resolves them against `base_url`:
 
-| Service | Versions | Default | Route |
-|---------|----------|---------|-------|
-| Translation | `v1`, `v2` | `v1` | `/v1/translate`, `/v2/translate` |
-| ASR | `v1`, `v2`, `v3` | `v3` | `/asr/{version}/transcribe` |
-| TTS | `v1`, `v2` | `v1` | `/tts/v1/tts`, `/tts/v2/synthesize` |
+| Service | Route |
+|---------|-------|
+| Translation | `/translate/v1/translate` |
+| ASR | `/asr/v1/transcribe` |
+| TTS | `/tts/v1/synthesize` |
 
-The registry maps `(service, version)` to a path rather than interpolating the
-version, because TTS renamed its route: `/tts/v2/tts` is a 404. A test asserts
-every selectable version has an entry and that no entry is unreachable.
+Authentication is an `Authorization: Bearer` header built in
+`BaseApi._prepare_headers()`. That method sets no `Content-Type`: httpx adds
+`application/json` for `json=` bodies, and ASR uploads declare their own type
+(`audio/*` or `video/*` from the file extension, else
+`application/octet-stream`) because the gateway answers anything else with a
+415.
 
-ASR moved to v3 because it is the only version change that earns itself:
-same latency as v1 (measured at 0.65s on a 1.2s clip and 3.1s on a 22.8s
-clip), but a structured body carrying `warnings` and optional word/segment
-timings. Translation v2 and TTS v2 are identical to v1 in shape, latency and
-output, so the SDK stays on v1 for those. Set `Settings.asr_version` to pin
-an older version.
-
-TTS has no v3, and translation has no v3 — v2 is the ceiling for both.
-
-Only `/asr/v1/languages` has no catalogue endpoint; `SUPPORTED_ASR_LANGUAGES`
-is therefore generated from `/asr/v3/languages`, whose codes v1 also accepts.
+`SUPPORTED_ASR_LANGUAGES` and `SUPPORTED_TTS_LANGUAGES` are generated from
+`/asr/v1/languages` and `/tts/v1/languages`.

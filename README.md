@@ -30,7 +30,7 @@ pip install khaya
 
 ## Authentication
 
-Get an API key at [https://translation.ghananlp.org](https://translation.ghananlp.org) and set it as an environment variable:
+Get an API key from [https://docs.khaya.ai](https://docs.khaya.ai) and set it as an environment variable:
 
 ```bash
 export KHAYA_API_KEY=your_api_key_here
@@ -92,6 +92,7 @@ All errors raise exceptions — never return error dicts. Catch the appropriate 
 from khaya import KhayaClient
 from khaya.exceptions import (
     AuthenticationError,
+    InsufficientCreditsError,
     RateLimitError,
     TranslationError,
     APIError,
@@ -104,6 +105,8 @@ try:
     print(result.text)
 except AuthenticationError:
     print("Invalid API key. Check your KHAYA_API_KEY.")
+except InsufficientCreditsError as e:
+    print(f"Out of credits: {e.message}")
 except RateLimitError as e:
     print(f"Rate limit hit: {e.message}")
 except TranslationError as e:
