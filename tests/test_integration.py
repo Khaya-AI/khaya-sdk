@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from khaya import KhayaClient
+from khaya.config import Settings
 from khaya.constants import (
     SUPPORTED_ASR_LANGUAGES,
     SUPPORTED_TTS_LANGUAGES,
@@ -22,6 +23,11 @@ from khaya.exceptions import APIError, AuthenticationError, TTSGenerationError
 from khaya.models import SynthesisResult, TranscriptionResult, TranslationResult
 
 AUDIO_FIXTURE = Path(__file__).parent / "me_ho_ye.wav"
+
+
+def _config_like(client: KhayaClient, api_key: str) -> Settings:
+    """Settings that reach the same API as ``client`` with another key."""
+    return Settings(api_key=api_key, base_url=client.config.base_url, retry_attempts=1)
 
 
 @pytest.fixture(scope="session")
@@ -65,11 +71,12 @@ def test_unsupported_pair_returns_structured_error(integration_client):
 
 
 @pytest.mark.integration
-def test_invalid_key_raises_authentication_error():
-    with KhayaClient("0" * 32) as client:
+def test_invalid_key_raises_authentication_error(integration_client):
+    with KhayaClient("0" * 32, config=_config_like(integration_client, "0" * 32)) as client:
         with pytest.raises(AuthenticationError) as exc:
             client.translate("Hello", "en-tw")
     assert exc.value.status_code == 401
+    assert exc.value.code == "INVALID_API_KEY"
 
 
 # ---------------------------------------------------------------------------
@@ -179,21 +186,18 @@ def test_unknown_speaker_is_rejected_client_side(integration_client):
 
 
 @pytest.mark.integration
-def test_translate_route_works():
-    with KhayaClient(os.environ["KHAYA_API_KEY"]) as client:
-        assert client.translate("Good morning", "eng-twi").text.strip()
+def test_translate_route_works(integration_client):
+    assert integration_client.translate("Good morning", "eng-twi").text.strip()
 
 
 @pytest.mark.integration
-def test_asr_route_works():
-    with KhayaClient(os.environ["KHAYA_API_KEY"]) as client:
-        assert client.transcribe(str(AUDIO_FIXTURE), "twi").text.strip()
+def test_asr_route_works(integration_client):
+    assert integration_client.transcribe(str(AUDIO_FIXTURE), "twi").text.strip()
 
 
 @pytest.mark.integration
-def test_tts_route_works():
-    with KhayaClient(os.environ["KHAYA_API_KEY"]) as client:
-        assert client.synthesize("Me ho yɛ", "twi").audio[:4] == b"RIFF"
+def test_tts_route_works(integration_client):
+    assert integration_client.synthesize("Me ho yɛ", "twi").audio[:4] == b"RIFF"
 
 
 # ---------------------------------------------------------------------------

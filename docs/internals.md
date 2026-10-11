@@ -19,6 +19,7 @@ flowchart TD
     H -->|retryable\n429 · 5xx · network| J[Backoff & retry]
     J --> H
     H -->|401| K([AuthenticationError])
+    H -->|402| N([InsufficientCreditsError])
     H -->|429 — retries exhausted| L([RateLimitError])
     H -->|other error| M([APIError])
 ```
@@ -86,6 +87,7 @@ classDiagram
 
     class APIError
     class AuthenticationError
+    class InsufficientCreditsError
     class RateLimitError
     class TranslationError
     class TTSGenerationError
@@ -100,6 +102,7 @@ classDiagram
     TtsService --> BaseApi : uses
 
     APIError <|-- AuthenticationError
+    APIError <|-- InsufficientCreditsError
     APIError <|-- RateLimitError
     APIError <|-- TranslationError
     APIError <|-- TTSGenerationError
@@ -125,6 +128,7 @@ See the [Logging guide](guides/logging.md) for how to enable and configure SDK l
 | HTTP status | Exception raised |
 |-------------|-----------------|
 | 401 | `AuthenticationError` |
+| 402 | `InsufficientCreditsError` (not retried) |
 | 429 (retries exhausted) | `RateLimitError` |
 | 500, 502, 503, 504 (retries exhausted) | `APIError` |
 | Network / transport failure (retries exhausted) | `APIError` (status_code=0) |
@@ -132,6 +136,13 @@ See the [Logging guide](guides/logging.md) for how to enable and configure SDK l
 | 200 with a non-JSON body (translation, ASR) | `APIError` |
 | Empty text / missing file / unknown speaker (before HTTP) | Service-specific exception |
 | Missing API key (before HTTP) | `AuthenticationError` |
+
+Error bodies are parsed from the platform gateway's envelope,
+`{"detail": {"error", "message", "details", "request_id"}}`, into `code`,
+`message`, `details` and `activity_id`. When `message` is absent the code
+stands in for it, and a 402 builds one from the balance, estimated cost and
+top-up link. The older `{"error": {...}}` and `{"statusCode", "message",
+"activityId"}` envelopes are still read.
 
 ## API version
 

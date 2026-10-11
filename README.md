@@ -92,6 +92,7 @@ All errors raise exceptions — never return error dicts. Catch the appropriate 
 from khaya import KhayaClient
 from khaya.exceptions import (
     AuthenticationError,
+    InsufficientCreditsError,
     RateLimitError,
     TranslationError,
     APIError,
@@ -104,6 +105,8 @@ try:
     print(result.text)
 except AuthenticationError:
     print("Invalid API key. Check your KHAYA_API_KEY.")
+except InsufficientCreditsError as e:
+    print(f"Out of credits: {e.message}")
 except RateLimitError as e:
     print(f"Rate limit hit: {e.message}")
 except TranslationError as e:

@@ -86,7 +86,7 @@ The SDK retries automatically on:
 - `500`, `502`, `503`, `504` server errors
 - Network/transport errors (connection refused, DNS failure, etc.)
 
-**401 Unauthorized** is never retried.
+Other 4xx errors are never retried — including **401 Unauthorized** and **402 Insufficient credits**.
 
 All three endpoints are POST and metered, so a 500 the backend actually
 processed is retried and billed again. Set `retry_attempts=1` to disable.

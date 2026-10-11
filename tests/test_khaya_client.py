@@ -17,6 +17,7 @@ from khaya.exceptions import (
     APIError,
     ASRTranscriptionError,
     AuthenticationError,
+    InsufficientCreditsError,
     RateLimitError,
     TranslationError,
     TTSGenerationError,
@@ -87,6 +88,33 @@ class TestTranslate:
         )
         with pytest.raises(APIError):
             make_client().translate("Hello", "en-tw")
+
+    def test_platform_object_response_is_parsed(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={"text": "Maakye", "source_language": "eng", "target_language": "twi"},
+            )
+        )
+        result = make_client().translate("Good morning", "eng-twi")
+        assert result.text == "Maakye"
+        assert (result.source_language, result.target_language) == ("eng", "twi")
+
+    def test_unrecognised_response_shape_raises(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(return_value=httpx.Response(200, json={"out": 1}))
+        with pytest.raises(TranslationError, match="Unexpected translation response"):
+            make_client().translate("Hello", "en-tw")
+
+    async def test_async_platform_object_response_is_parsed(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(200, json={"text": "Maakye"})
+        )
+        assert (await make_client().atranslate("Good morning", "eng-twi")).text == "Maakye"
+
+    def test_request_body_uses_the_in_lang_format(self, respx_mock):
+        route = respx_mock.post(TRANSLATE_URL).mock(return_value=httpx.Response(200, json="x"))
+        make_client().translate("Hello", "eng-twi")
+        assert json.loads(route.calls.last.request.content) == {"in": "Hello", "lang": "eng-twi"}
 
 
 # ---------------------------------------------------------------------------
@@ -868,3 +896,157 @@ class TestNoClientSideLanguageValidation:
         with warnings.catch_warnings():
             warnings.simplefilter("error")
             make_client().synthesize("Hello", "xx")
+
+
+# ---------------------------------------------------------------------------
+# Platform gateway error envelope: {"detail": {"error": ..., ...}}
+# ---------------------------------------------------------------------------
+
+
+class TestPlatformErrorEnvelope:
+    def test_invalid_key(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(
+                401,
+                json={
+                    "detail": {
+                        "error": "INVALID_API_KEY",
+                        "message": "API key not found or revoked",
+                    }
+                },
+            )
+        )
+        with pytest.raises(AuthenticationError) as exc:
+            make_client().translate("Hello", "en-tw")
+        assert exc.value.code == "INVALID_API_KEY"
+        assert exc.value.message == "API key not found or revoked"
+
+    def test_code_stands_in_for_a_missing_message(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(401, json={"detail": {"error": "EMPTY_API_KEY"}})
+        )
+        with pytest.raises(AuthenticationError) as exc:
+            make_client().translate("Hello", "en-tw")
+        assert exc.value.message == "EMPTY_API_KEY"
+
+    def test_validation_details_and_request_id(self, respx_mock):
+        respx_mock.post(TTS_URL).mock(
+            return_value=httpx.Response(
+                422,
+                json={
+                    "detail": {
+                        "error": "VALIDATION_FAILED",
+                        "message": "The request payload contains invalid parameters.",
+                        "details": [
+                            {
+                                "code": "MISSING_LANGUAGE",
+                                "message": "No language selected",
+                                "target": "language",
+                            }
+                        ],
+                        "request_id": "req-123",
+                    }
+                },
+            )
+        )
+        with pytest.raises(APIError) as exc:
+            make_client().synthesize("Hello", "twi")
+        err = exc.value
+        assert err.status_code == 422
+        assert err.code == "VALIDATION_FAILED"
+        assert err.details[0]["target"] == "language"
+        assert err.activity_id == "req-123"
+        assert "language: No language selected" in str(err)
+
+    def test_insufficient_credits(self, respx_mock):
+        route = respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(
+                402,
+                json={
+                    "detail": {
+                        "error": "INSUFFICIENT_CREDITS",
+                        "balance": 3,
+                        "estimated_cost": 10,
+                        "top_up_url": "https://khaya.ai/billing",
+                    }
+                },
+            )
+        )
+        with pytest.raises(InsufficientCreditsError) as exc:
+            make_client(retry_attempts=3).translate("Hello", "en-tw")
+        assert exc.value.code == "INSUFFICIENT_CREDITS"
+        assert "balance 3" in exc.value.message
+        assert "~10" in exc.value.message
+        assert "https://khaya.ai/billing" in exc.value.message
+        assert route.call_count == 1  # topping up is the only fix; retrying is not
+
+    def test_insufficient_credits_is_an_api_error(self):
+        assert issubclass(InsufficientCreditsError, APIError)
+
+    def test_rate_limit(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(
+                429,
+                json={
+                    "detail": {
+                        "error": "RATE_LIMIT_EXCEEDED",
+                        "violated_limit": "rate_limit_per_minute",
+                        "retry_after_seconds": 12,
+                    }
+                },
+                headers={"Retry-After": "12"},
+            )
+        )
+        with pytest.raises(RateLimitError) as exc:
+            make_client().translate("Hello", "en-tw")
+        assert exc.value.code == "RATE_LIMIT_EXCEEDED"
+        assert exc.value.message == "Rate limit exceeded: rate_limit_per_minute (Retry-After: 12s)"
+        assert "Retry-After: 12s" in exc.value.message
+
+    @pytest.mark.parametrize("code", ["ROUTE_NOT_ALLOWED", "SIGNUP_REQUIRED"])
+    def test_forbidden(self, respx_mock, code):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(403, json={"detail": {"error": code, "message": "no"}})
+        )
+        with pytest.raises(APIError) as exc:
+            make_client().translate("Hello", "en-tw")
+        assert (exc.value.status_code, exc.value.code) == (403, code)
+
+    def test_unsupported_media_type(self, respx_mock, tmp_path):
+        audio = tmp_path / "clip.wav"
+        audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+        respx_mock.post(ASR_URL).mock(
+            return_value=httpx.Response(
+                415,
+                json={
+                    "detail": {
+                        "error": "UNSUPPORTED_MEDIA_TYPE",
+                        "message": "Content-Type must be audio/*, video/*, or application/octet-stream",
+                    }
+                },
+            )
+        )
+        with pytest.raises(APIError) as exc:
+            make_client().transcribe(str(audio), "twi")
+        assert exc.value.code == "UNSUPPORTED_MEDIA_TYPE"
+
+    def test_string_detail(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(404, json={"detail": "Not Found"})
+        )
+        with pytest.raises(APIError) as exc:
+            make_client().translate("Hello", "en-tw")
+        assert (exc.value.status_code, exc.value.message) == (404, "Not Found")
+
+    def test_upstream_502_is_retried(self, respx_mock, monkeypatch):
+        monkeypatch.setattr("time.sleep", lambda _: None)
+        route = respx_mock.post(TRANSLATE_URL).mock(
+            side_effect=[
+                httpx.Response(
+                    502, json={"detail": {"error": "UPSTREAM_ERROR", "request_id": "r1"}}
+                ),
+                httpx.Response(200, json="Maakye"),
+            ]
+        )
+        assert make_client(retry_attempts=2).translate("Hello", "en-tw").text == "Maakye"
+        assert route.call_count == 2

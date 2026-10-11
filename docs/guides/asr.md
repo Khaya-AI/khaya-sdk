@@ -20,6 +20,8 @@ The second argument is the **language code** of the spoken language in the audio
 |-----------|------|-------------|
 | `text` | `str` | The transcribed string |
 | `language` | `str` | Language code of the audio (e.g. `"twi"`) |
+| `warnings` | `list[str]` | Advisories from the API, e.g. a legacy language code (see below) |
+| `timings` | `Timings \| None` | Word or segment offsets when `timestamps` is set, else `None` |
 
 ## Warnings from the API
 

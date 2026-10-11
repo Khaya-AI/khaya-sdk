@@ -1,10 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from khaya.config import (
-    DevSettings,
-    Settings,
-)
+from khaya.config import DevSettings, Settings
 from khaya.constants import RETRY_ATTEMPTS, TIMEOUT
 
 
@@ -37,6 +34,12 @@ def test_extra_fields_are_forbidden():
 def test_http_base_url_rejected():
     with pytest.raises(ValidationError, match="HTTPS"):
         Settings(api_key="key", base_url="http://translation-api.ghananlp.org")
+
+
+def test_base_url_read_from_the_environment(monkeypatch):
+    monkeypatch.setenv("KHAYA_BASE_URL", "https://staging.example.com")
+    endpoints = Settings(api_key="k").endpoints
+    assert endpoints["translation"] == "https://staging.example.com/translate/v1/translate"
 
 
 def test_custom_timeout_and_retries():

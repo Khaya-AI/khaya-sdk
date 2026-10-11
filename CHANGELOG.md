@@ -26,8 +26,25 @@ with it.
 - Language catalogues for the MCP `list_languages` refresh come from
   `/asr/v1/languages` and `/tts/v1/languages`.
 
+### Added
+
+- `InsufficientCreditsError` (HTTP 402), raised when the account's credit
+  balance cannot cover a request. Not retried. The message names the
+  balance, the estimated cost and the top-up link.
+
 ### Fixed
 
+- Errors from the platform gateway, `{"detail": {"error": ..., "message": ...}}`,
+  came back as a bare `HTTP 401` with no `code`. `code`, `message`, `details`
+  and `activity_id` (the gateway's `request_id`) are now populated from it.
+- `translate()` accepts a `{"text": ...}` response as well as a bare string.
+  The API returns the object for its newer request format.
+- The MCP `list_languages(refresh=True)` built `//asr/...` URLs when
+  `base_url` ended with a slash.
+- The TTS guide repeated its speaker section three times with contradictory
+  claims (that the API ignores `speaker`, and that it accepts any value). It
+  now has one section: the speakers produce distinct voices, and the API
+  rejects an unknown one with `INVALID_SPEAKER`.
 - ASR uploads were sent as `application/json`, which the gateway rejects with
   `415 UNSUPPORTED_MEDIA_TYPE`. The upload now declares `audio/*` or `video/*`
   from the file extension, falling back to `application/octet-stream`.
