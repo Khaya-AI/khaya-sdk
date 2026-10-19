@@ -18,7 +18,7 @@ Requires Python 3.11 or later.
 
 ## Get an API key
 
-Sign up at [https://translation.ghananlp.org](https://translation.ghananlp.org) to get your API key.
+Get an API key from [https://docs.khaya.ai](https://docs.khaya.ai) (see Getting started and Authentication there).
 
 ## Authentication
 
