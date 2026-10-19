@@ -7,12 +7,9 @@
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `api_key` | `None` | Your Khaya API key |
-| `base_url` | `https://translation-api.ghananlp.org` | API base URL |
+| `base_url` | `https://api.khaya.ai` | API base URL |
 | `timeout` | `30` | Request timeout in seconds |
 | `retry_attempts` | `3` | Number of attempts on transient failures |
-| `translation_version` | `v1` | Translation API version — `v1` or `v2` |
-| `asr_version` | `v3` | ASR API version — `v1`, `v2` or `v3` |
-| `tts_version` | `v1` | TTS API version — `v1` or `v2` |
 
 ## Environment variables
 
@@ -24,9 +21,6 @@ Every setting can come from a `KHAYA_`-prefixed environment variable:
 | `KHAYA_BASE_URL` | `base_url` |
 | `KHAYA_TIMEOUT` | `timeout` |
 | `KHAYA_RETRY_ATTEMPTS` | `retry_attempts` |
-| `KHAYA_TRANSLATION_VERSION` | `translation_version` |
-| `KHAYA_ASR_VERSION` | `asr_version` |
-| `KHAYA_TTS_VERSION` | `tts_version` |
 
 ```python
 import os
@@ -69,27 +63,20 @@ with KhayaClient(api_key="your-key", config=config) as khaya:
 
 When `config` is provided, the `api_key` argument to `KhayaClient` is ignored — the key from `Settings` is used.
 
-## API versions
+## API version
 
-Each service is versioned independently and the SDK pins a default per
-service. Versions are explicit, never negotiated at runtime: the API publishes
-no capability endpoint, and response shapes differ between versions — ASR v1
-returns a bare string where v3 returns an object. An SDK that followed the
-latest automatically would change parsing under you with no release.
+The Khaya platform publishes one API version, `v1`, for translation, ASR and
+TTS, so there is nothing to select. The SDK sends your key as an
+`Authorization: Bearer` token and calls:
 
-```python
-config = Settings(api_key=key, asr_version="v1", tts_version="v2")
-```
+| Service | Route |
+|---------|-------|
+| Translation | `/translate/v1/translate` |
+| ASR | `/asr/v1/transcribe` |
+| TTS | `/tts/v1/synthesize` |
 
-An unavailable version fails at construction, not as a 404. The route is not
-always a substitution — TTS renamed its path between versions, so `v2` resolves
-to `/tts/v2/synthesize` rather than `/tts/v2/tts`.
-
-| Service | Available | Default | Why |
-|---------|-----------|---------|-----|
-| Translation | `v1`, `v2` | `v1` | v2 is identical in shape, latency and output |
-| ASR | `v1`, `v2`, `v3` | `v3` | same latency as v1, plus warnings and timings |
-| TTS | `v1`, `v2` | `v1` | v2 serves the same audio from a different route |
+The per-service `translation_version`, `asr_version` and `tts_version` options
+from 0.3.x were removed in 0.4.0. Passing one raises a validation error.
 
 ## Retry behaviour
 
@@ -99,7 +86,7 @@ The SDK retries automatically on:
 - `500`, `502`, `503`, `504` server errors
 - Network/transport errors (connection refused, DNS failure, etc.)
 
-**401 Unauthorized** is never retried.
+Other 4xx errors are never retried — including **401 Unauthorized** and **402 Insufficient credits**.
 
 All three endpoints are POST and metered, so a 500 the backend actually
 processed is retried and billed again. Set `retry_attempts=1` to disable.
