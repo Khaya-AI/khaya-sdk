@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-19
+
 Moves the SDK to the new Khaya platform. This is a breaking release (0.4.0):
 the old Azure APIM host and `Ocp-Apim-Subscription-Key` auth no longer work
 with it.
@@ -31,9 +33,28 @@ with it.
 - `InsufficientCreditsError` (HTTP 402), raised when the account's credit
   balance cannot cover a request. Not retried. The message names the
   balance, the estimated cost and the top-up link.
+- `PayloadTooLargeError` (HTTP 413, platform code `REQUEST_TOO_LARGE`) and
+  `UnsupportedMediaTypeError` (HTTP 415, `UNSUPPORTED_MEDIA_TYPE`). Neither is
+  retried. Both are exported from `khaya`.
+- `ServerError` (HTTP 5xx), a subclass of `APIError`, raised once the retries
+  for a 500, 502, 503 or 504 run out. Existing `except APIError` handlers keep
+  working.
+- Every error carries `code`, `details` and `activity_id`. When the body has no
+  request ID, as with a 413 from the gateway, `activity_id` falls back to the
+  `X-Khaya-Request-Id` or `X-Correlation-ID` response header.
+- `Usage`, available as `result.usage` on translation, ASR and TTS results. It
+  reads the gateway's `X-Estimated-Credit-Cost`, `X-RateLimit-Limit-Minute`,
+  `X-RateLimit-Remaining-Minute`, `X-Free-Credits-Remaining`,
+  `X-Khaya-Request-Id` and `X-Correlation-ID` headers, and is `None` when none
+  are sent.
 
 ### Fixed
 
+- The MCP server failed its error test on mcp 2.2.0. From mcp 2.1 a tool that
+  raises anything but `ToolError` is treated as a crash and the model sees only
+  `Error executing tool <name>`. SDK errors are now re-raised as `ToolError`
+  with their full message, so the model still sees the valid speakers, the
+  top-up link and the request ID.
 - Errors from the platform gateway, `{"detail": {"error": ..., "message": ...}}`,
   came back as a bare `HTTP 401` with no `code`. `code`, `message`, `details`
   and `activity_id` (the gateway's `request_id`) are now populated from it.
@@ -51,11 +72,26 @@ with it.
 
 ### Migration from 0.3.x
 
-1. Replace any `base_url` override that points at `translation-api.ghananlp.org`
-   (or remove it to use the new default).
-2. Use an API key from the Khaya platform (see https://docs.khaya.ai).
-3. Delete `translation_version`, `asr_version` and `tts_version` from your
-   `Settings(...)` calls and from any `KHAYA_*_VERSION` environment variables.
+1. Upgrade with `pip install -U khaya`.
+2. The old APIM host `translation-api.ghananlp.org` and the
+   `Ocp-Apim-Subscription-Key` header are gone. The SDK now calls
+   `https://api.khaya.ai` and sends `Authorization: Bearer <key>`. Remove any
+   `base_url` override that points at the old host, or set it to
+   `https://api.khaya.ai`.
+3. Use an API key from the Khaya platform (see https://docs.khaya.ai). An old
+   APIM subscription key will get a 401.
+4. Set the key in the `KHAYA_API_KEY` environment variable, or pass it to
+   `KhayaClient(...)`. `KHAYA_BASE_URL`, `KHAYA_TIMEOUT` and
+   `KHAYA_RETRY_ATTEMPTS` are also read.
+5. Delete `translation_version`, `asr_version` and `tts_version` from your
+   `Settings(...)` calls and any `KHAYA_*_VERSION` variables. Passing one now
+   raises a validation error. The routes are `/translate/v1/translate`,
+   `/asr/v1/transcribe` and `/tts/v1/synthesize`.
+6. If you call the API through your own HTTP code, errors now arrive as
+   `{"detail": {"error": ..., "message": ..., "details": [...], "request_id": ...}}`.
+   The SDK parses that envelope for you. Catch `InsufficientCreditsError`,
+   `PayloadTooLargeError`, `UnsupportedMediaTypeError` and `ServerError`, or
+   keep catching `APIError`, which they all extend.
 
 ---
 
