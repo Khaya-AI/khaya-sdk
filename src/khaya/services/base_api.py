@@ -12,7 +12,10 @@ from khaya.exceptions import (
     APIError,
     AuthenticationError,
     InsufficientCreditsError,
+    PayloadTooLargeError,
     RateLimitError,
+    ServerError,
+    UnsupportedMediaTypeError,
 )
 
 logger = logging.getLogger(__name__)
@@ -127,6 +130,12 @@ def _build_http_exception(response: httpx.Response) -> APIError:
     status = response.status_code
     fields = _parse_error_body(response)
     message = fields.pop("message")
+    # Errors raised by the gateway's middleware (413) carry no request ID in
+    # the body, but the response headers still do.
+    if not fields.get("activity_id"):
+        fields["activity_id"] = response.headers.get("X-Khaya-Request-Id") or response.headers.get(
+            "X-Correlation-ID"
+        )
 
     if status == 401:
         return AuthenticationError(message, status, **fields)
@@ -134,11 +143,20 @@ def _build_http_exception(response: httpx.Response) -> APIError:
     if status == 402:
         return InsufficientCreditsError(message, status, **fields)
 
+    if status == 413:
+        return PayloadTooLargeError(message, status, **fields)
+
+    if status == 415:
+        return UnsupportedMediaTypeError(message, status, **fields)
+
     if status == 429:
         retry_after = response.headers.get("Retry-After")
         if retry_after:
             message = f"{message} (Retry-After: {retry_after}s)"
         return RateLimitError(message, status, **fields)
+
+    if 500 <= status <= 599:
+        return ServerError(message, status, **fields)
 
     return APIError(message, status, **fields)
 
@@ -282,7 +300,11 @@ class BaseApi:
 
         Raises:
             AuthenticationError: On 401.
+            InsufficientCreditsError: On 402.
+            PayloadTooLargeError: On 413.
+            UnsupportedMediaTypeError: On 415.
             RateLimitError: On 429 after all retries exhausted.
+            ServerError: On 5xx after all retries exhausted.
             APIError: On other HTTP errors or transport failures.
         """
         kwargs["headers"] = {**self._prepare_headers(), **(kwargs.get("headers") or {})}
@@ -347,7 +369,11 @@ class BaseApi:
 
         Raises:
             AuthenticationError: On 401.
+            InsufficientCreditsError: On 402.
+            PayloadTooLargeError: On 413.
+            UnsupportedMediaTypeError: On 415.
             RateLimitError: On 429 after all retries exhausted.
+            ServerError: On 5xx after all retries exhausted.
             APIError: On other HTTP errors or transport failures.
         """
         kwargs["headers"] = {**self._prepare_headers(), **(kwargs.get("headers") or {})}

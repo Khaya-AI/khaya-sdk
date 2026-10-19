@@ -18,11 +18,14 @@ from khaya.exceptions import (
     ASRTranscriptionError,
     AuthenticationError,
     InsufficientCreditsError,
+    PayloadTooLargeError,
     RateLimitError,
+    ServerError,
     TranslationError,
     TTSGenerationError,
+    UnsupportedMediaTypeError,
 )
-from khaya.models import SynthesisResult, TranscriptionResult, TranslationResult
+from khaya.models import SynthesisResult, TranscriptionResult, TranslationResult, Usage
 
 BASE_URL = "https://api.khaya.ai"
 TRANSLATE_URL = f"{BASE_URL}/translate/v1/translate"
@@ -120,6 +123,62 @@ class TestTranslate:
 # ---------------------------------------------------------------------------
 # ASR
 # ---------------------------------------------------------------------------
+
+
+class TestUsage:
+    GATEWAY_HEADERS = {
+        "X-Estimated-Credit-Cost": "4",
+        "X-RateLimit-Limit-Minute": "60",
+        "X-RateLimit-Remaining-Minute": "59",
+        "X-Khaya-Request-Id": "req-1",
+        "X-Correlation-ID": "corr-1",
+    }
+
+    def test_translate_exposes_usage(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(200, json="Ɛte sɛn?", headers=self.GATEWAY_HEADERS)
+        )
+        usage = make_client().translate("Hello", "en-tw").usage
+        assert usage == Usage(
+            estimated_credit_cost=4,
+            rate_limit_per_minute=60,
+            rate_limit_remaining_minute=59,
+            request_id="req-1",
+            correlation_id="corr-1",
+        )
+
+    def test_synthesize_exposes_usage(self, respx_mock):
+        respx_mock.post(TTS_URL).mock(
+            return_value=httpx.Response(
+                200, content=WAV_BYTES, headers={**AUDIO_HEADERS, **self.GATEWAY_HEADERS}
+            )
+        )
+        assert make_client().synthesize("Hello", "twi").usage.estimated_credit_cost == 4
+
+    def test_transcribe_exposes_usage(self, tmp_path, respx_mock):
+        audio = tmp_path / "a.wav"
+        audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+        respx_mock.post(ASR_URL).mock(
+            return_value=httpx.Response(200, json={"text": "hi"}, headers=self.GATEWAY_HEADERS)
+        )
+        assert make_client().transcribe(str(audio), "twi").usage.request_id == "req-1"
+
+    def test_anonymous_key_reports_free_credits(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(200, json="x", headers={"X-Free-Credits-Remaining": "7"})
+        )
+        usage = make_client().translate("Hello", "en-tw").usage
+        assert usage.free_credits_remaining == 7
+        assert usage.estimated_credit_cost is None
+
+    def test_no_headers_means_no_usage(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(return_value=httpx.Response(200, json="x"))
+        assert make_client().translate("Hello", "en-tw").usage is None
+
+    def test_malformed_number_is_ignored(self):
+        usage = Usage.from_headers({"X-Estimated-Credit-Cost": "n/a", "X-Khaya-Request-Id": "r"})
+        assert usage.estimated_credit_cost is None
+        assert usage.request_id == "r"
 
 
 class TestRequestHeaders:
@@ -1001,6 +1060,73 @@ class TestPlatformErrorEnvelope:
     def test_insufficient_credits_is_an_api_error(self):
         assert issubclass(InsufficientCreditsError, APIError)
 
+    def test_payload_too_large(self, tmp_path, respx_mock):
+        audio = tmp_path / "big.wav"
+        audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+        route = respx_mock.post(ASR_URL).mock(
+            return_value=httpx.Response(
+                413,
+                json={
+                    "detail": {
+                        "error": "REQUEST_TOO_LARGE",
+                        "message": "Request body exceeds the maximum allowed size",
+                    }
+                },
+                headers={"X-Khaya-Request-Id": "req-413"},
+            )
+        )
+        with pytest.raises(PayloadTooLargeError) as exc:
+            make_client(retry_attempts=3).transcribe(str(audio), "twi")
+        assert exc.value.status_code == 413
+        assert exc.value.code == "REQUEST_TOO_LARGE"
+        assert exc.value.activity_id == "req-413"  # from the header; the body has none
+        assert route.call_count == 1
+
+    def test_unsupported_media_type_is_typed_and_not_retried(self, respx_mock):
+        route = respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(
+                415,
+                json={
+                    "detail": {
+                        "error": "UNSUPPORTED_MEDIA_TYPE",
+                        "message": "Content-Type must be application/json",
+                        "request_id": "req-415",
+                    }
+                },
+            )
+        )
+        with pytest.raises(UnsupportedMediaTypeError) as exc:
+            make_client(retry_attempts=3).translate("Hello", "en-tw")
+        assert exc.value.status_code == 415
+        assert exc.value.code == "UNSUPPORTED_MEDIA_TYPE"
+        assert exc.value.activity_id == "req-415"
+        assert route.call_count == 1
+
+    def test_server_error_is_retried_then_typed(self, monkeypatch, respx_mock):
+        monkeypatch.setattr("khaya.services.base_api.time.sleep", lambda _: None)
+        route = respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(
+                503, json={"detail": {"error": "SYSTEM_ERROR", "request_id": "req-503"}}
+            )
+        )
+        with pytest.raises(ServerError) as exc:
+            make_client(retry_attempts=2).translate("Hello", "en-tw")
+        assert exc.value.status_code == 503
+        assert exc.value.code == "SYSTEM_ERROR"
+        assert exc.value.activity_id == "req-503"
+        assert route.call_count == 2
+
+    @pytest.mark.parametrize("cls", [PayloadTooLargeError, UnsupportedMediaTypeError, ServerError])
+    def test_new_errors_are_api_errors(self, cls):
+        assert issubclass(cls, APIError)
+
+    def test_new_errors_are_exported(self):
+        import khaya
+
+        for name in ("PayloadTooLargeError", "UnsupportedMediaTypeError", "ServerError", "Usage"):
+            assert name in khaya.__all__
+            assert hasattr(khaya, name)
+
     def test_rate_limit(self, respx_mock):
         respx_mock.post(TRANSLATE_URL).mock(
             return_value=httpx.Response(
@@ -1044,7 +1170,7 @@ class TestPlatformErrorEnvelope:
                 },
             )
         )
-        with pytest.raises(APIError) as exc:
+        with pytest.raises(UnsupportedMediaTypeError) as exc:
             make_client().transcribe(str(audio), "twi")
         assert exc.value.code == "UNSUPPORTED_MEDIA_TYPE"
 
