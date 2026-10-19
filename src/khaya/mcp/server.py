@@ -6,13 +6,15 @@ codes are valid, since guessing between ``tw``, ``twi`` and ``eng-twi`` is the
 most likely way a model gets this wrong.
 """
 
+import functools
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import asdict
-from typing import Any, Literal
+from typing import Any, Literal, ParamSpec, TypeVar
 
 from mcp.server import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 
 from khaya import KhayaClient, __version__
 from khaya.constants import (
@@ -41,6 +43,29 @@ _CATALOGUES: dict[str, frozenset[str]] = {
 
 class MissingAPIKeyError(RuntimeError):
     """Raised at startup rather than on the first tool call."""
+
+
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+
+
+def _report_sdk_errors(fn: Callable[_P, Awaitable[_R]]) -> Callable[_P, Awaitable[_R]]:
+    """Surface SDK errors to the model as ``ToolError``.
+
+    From mcp 2.1 a tool failure other than ``ToolError`` is treated as a crash,
+    and the model sees only ``Error executing tool <name>``. An SDK error is an
+    anticipated failure whose message tells the model how to recover (valid
+    speakers, a top-up link, the request ID), so it is passed on in full.
+    """
+
+    @functools.wraps(fn)
+    async def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+        try:
+            return await fn(*args, **kwargs)
+        except APIError as e:
+            raise ToolError(str(e)) from e
+
+    return wrapper
 
 
 def _client() -> KhayaClient:
@@ -76,6 +101,7 @@ def build_server(client: KhayaClient | None = None) -> MCPServer:
     )
 
     @mcp.tool()
+    @_report_sdk_errors
     async def translate(text: str, language_pair: str = "eng-twi") -> str:
         """Translate text between English and an African language.
 
@@ -87,6 +113,7 @@ def build_server(client: KhayaClient | None = None) -> MCPServer:
         return result.text
 
     @mcp.tool()
+    @_report_sdk_errors
     async def transcribe(
         audio_path: str,
         language: str = "twi",
@@ -111,6 +138,7 @@ def build_server(client: KhayaClient | None = None) -> MCPServer:
         }
 
     @mcp.tool()
+    @_report_sdk_errors
     async def synthesize(
         text: str,
         output_path: str,
@@ -131,6 +159,7 @@ def build_server(client: KhayaClient | None = None) -> MCPServer:
         return output_path
 
     @mcp.tool()
+    @_report_sdk_errors
     async def list_languages(service: Service, refresh: bool = False) -> dict[str, Any]:
         """List the language codes a service accepts.
 
