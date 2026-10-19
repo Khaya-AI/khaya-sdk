@@ -5,7 +5,7 @@ from typing import Any, Literal
 import httpx
 
 from khaya.exceptions import ASRTranscriptionError
-from khaya.models import SegmentTiming, Timings, TranscriptionResult, WordTiming
+from khaya.models import SegmentTiming, Timings, TranscriptionResult, Usage, WordTiming
 from khaya.services.base_api import BaseApi, decode_json
 from khaya.utils import check_authentication
 
@@ -66,8 +66,9 @@ def _to_result(response: httpx.Response, language: str) -> TranscriptionResult:
     bare JSON string is also accepted and carries neither warnings nor timings.
     """
     body = decode_json(response)
+    usage = Usage.from_headers(response.headers)
     if isinstance(body, str):
-        return TranscriptionResult(text=body, language=language)
+        return TranscriptionResult(text=body, language=language, usage=usage)
 
     warnings = list(body.get("warnings", []))
     for warning in warnings:
@@ -77,6 +78,7 @@ def _to_result(response: httpx.Response, language: str) -> TranscriptionResult:
         language=language,
         warnings=warnings,
         timings=_timings(body.get("timings")),
+        usage=usage,
     )
 
 

@@ -3,7 +3,7 @@ import logging
 import httpx
 
 from khaya.exceptions import TranslationError
-from khaya.models import TranslationResult
+from khaya.models import TranslationResult, Usage
 from khaya.services.base_api import BaseApi, decode_json
 from khaya.utils import check_authentication
 
@@ -64,7 +64,10 @@ class TranslationService:
             "POST", self.endpoint, json={"in": text, "lang": language_pair}
         )
         return TranslationResult(
-            text=_translated_text(response), source_language=source, target_language=target
+            text=_translated_text(response),
+            source_language=source,
+            target_language=target,
+            usage=Usage.from_headers(response.headers),
         )
 
     @check_authentication
@@ -78,5 +81,8 @@ class TranslationService:
             "POST", self.endpoint, json={"in": text, "lang": language_pair}
         )
         return TranslationResult(
-            text=_translated_text(response), source_language=source, target_language=target
+            text=_translated_text(response),
+            source_language=source,
+            target_language=target,
+            usage=Usage.from_headers(response.headers),
         )

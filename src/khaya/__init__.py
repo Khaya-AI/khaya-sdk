@@ -12,9 +12,12 @@ from .exceptions import (
     ASRTranscriptionError,
     AuthenticationError,
     InsufficientCreditsError,
+    PayloadTooLargeError,
     RateLimitError,
+    ServerError,
     TranslationError,
     TTSGenerationError,
+    UnsupportedMediaTypeError,
 )
 from .khaya_client import KhayaClient
 from .models import (
@@ -23,6 +26,7 @@ from .models import (
     Timings,
     TranscriptionResult,
     TranslationResult,
+    Usage,
     WordTiming,
 )
 
@@ -38,6 +42,7 @@ __all__ = [
     "TranslationResult",
     "TranscriptionResult",
     "SynthesisResult",
+    "Usage",
     "Timings",
     "WordTiming",
     "SegmentTiming",
@@ -45,7 +50,10 @@ __all__ = [
     "APIError",
     "AuthenticationError",
     "InsufficientCreditsError",
+    "PayloadTooLargeError",
+    "UnsupportedMediaTypeError",
     "RateLimitError",
+    "ServerError",
     "TranslationError",
     "TTSGenerationError",
     "ASRTranscriptionError",
