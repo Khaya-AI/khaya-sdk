@@ -5,6 +5,7 @@ All exceptions inherit from `APIError` and expose `message` and `status_code` at
 ```
 APIError
 ├── AuthenticationError
+├── InsufficientCreditsError
 ├── RateLimitError
 ├── TranslationError
 ├── TTSGenerationError
@@ -14,6 +15,8 @@ APIError
 ::: khaya.exceptions.APIError
 
 ::: khaya.exceptions.AuthenticationError
+
+::: khaya.exceptions.InsufficientCreditsError
 
 ::: khaya.exceptions.RateLimitError
 

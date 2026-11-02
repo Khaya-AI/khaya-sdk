@@ -11,6 +11,7 @@ from .exceptions import (
     APIError,
     ASRTranscriptionError,
     AuthenticationError,
+    InsufficientCreditsError,
     RateLimitError,
     TranslationError,
     TTSGenerationError,
@@ -43,6 +44,7 @@ __all__ = [
     # Exceptions
     "APIError",
     "AuthenticationError",
+    "InsufficientCreditsError",
     "RateLimitError",
     "TranslationError",
     "TTSGenerationError",

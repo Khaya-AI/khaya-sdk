@@ -8,6 +8,7 @@ All errors in the Khaya SDK are raised as exceptions — never returned as error
 Exception
 └── APIError                  # base class for all Khaya errors
     ├── AuthenticationError   # 401 — invalid or missing API key
+    ├── InsufficientCreditsError  # 402 — credit balance too low for the request
     ├── RateLimitError        # 429 — too many requests
     ├── TranslationError      # bad input to translate()
     ├── TTSGenerationError    # bad input to synthesize()
@@ -22,7 +23,7 @@ All exceptions expose these attributes:
 | `status_code` | `int` | HTTP status code (0 for transport errors) |
 | `code` | `str \| None` | Machine-readable API error code, e.g. `"VALIDATION_FAILED"` |
 | `details` | `list[dict]` | Per-field details, each with `code`, `message`, and `target` |
-| `activity_id` | `str \| None` | Server-side correlation ID — quote this when reporting a problem |
+| `activity_id` | `str \| None` | Server-side correlation ID (the platform's `request_id`) — quote this when reporting a problem |
 
 `str(exc)` combines all of them; `exc.message` stays the bare API message.
 
@@ -76,6 +77,7 @@ All exceptions are available directly from `khaya`:
 from khaya import (
     APIError,
     AuthenticationError,
+    InsufficientCreditsError,
     RateLimitError,
     TranslationError,
     TTSGenerationError,
@@ -114,6 +116,29 @@ except RateLimitError as e:
     print(f"Still rate limited after retries: {e.message}")
 ```
 
+### Out of credits
+
+A request the account's credit balance cannot cover fails with
+`InsufficientCreditsError` (HTTP 402). It is not retried — it will keep failing
+until the balance is topped up. The message carries the balance, the estimated
+cost, and the top-up link:
+
+```python
+from khaya import InsufficientCreditsError
+
+try:
+    khaya.synthesize("Me ho yɛ", "twi")
+except InsufficientCreditsError as e:
+    print(e.message)
+    # Insufficient credits: balance 3, request costs ~10. Top up at https://...
+```
+
+### Key not allowed on a route
+
+A key restricted to some services gets a 403 `APIError` with
+`code == "ROUTE_NOT_ALLOWED"` on the others. Free anonymous keys that have used
+their allowance get `code == "SIGNUP_REQUIRED"`.
+
 ### Transport failures
 
 Network errors (timeouts, DNS failures) are also retried automatically. After all retries fail, an `APIError` is raised with `status_code=0`:
@@ -138,4 +163,4 @@ config = Settings(api_key=api_key, retry_attempts=5)
 client = KhayaClient(api_key=api_key, config=config)
 ```
 
-401 errors are **never** retried.
+Other 4xx errors — 401, 402, 403, validation errors — are **never** retried.

@@ -8,7 +8,12 @@ from typing import Any
 import httpx
 
 from khaya.config import Settings
-from khaya.exceptions import APIError, AuthenticationError, RateLimitError
+from khaya.exceptions import (
+    APIError,
+    AuthenticationError,
+    InsufficientCreditsError,
+    RateLimitError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,16 +46,54 @@ def _non_json_message(response: httpx.Response) -> str:
     return f"{prefix}: {snippet}" if snippet else prefix
 
 
+def _detail_message(detail: dict[str, Any], status: int) -> str:
+    """Message for a platform error. Not every error code carries one.
+
+    402 and 429 bodies carry numbers instead, which are what the caller needs
+    to act on.
+    """
+    if detail.get("message"):
+        return str(detail["message"])
+    code = detail.get("error")
+    if code == "INSUFFICIENT_CREDITS":
+        message = "Insufficient credits"
+        if "balance" in detail and "estimated_cost" in detail:
+            message += f": balance {detail['balance']}, request costs ~{detail['estimated_cost']}"
+        if detail.get("top_up_url"):
+            message += f". Top up at {detail['top_up_url']}"
+        return message
+    if code == "RATE_LIMIT_EXCEEDED" and detail.get("violated_limit"):
+        return f"Rate limit exceeded: {detail['violated_limit']}"
+    return str(code) if code else f"HTTP {status}"
+
+
+def _parse_platform_detail(detail: Any, status: int) -> dict[str, Any]:
+    """Parse the platform gateway's ``{"detail": ...}`` envelope."""
+    if isinstance(detail, str):
+        return {"message": detail}
+    if not isinstance(detail, dict):
+        return {"message": f"HTTP {status}"}
+    details = detail.get("details")
+    return {
+        "message": _detail_message(detail, status),
+        "code": detail.get("error"),
+        "details": details if isinstance(details, list) else None,
+        "activity_id": detail.get("request_id"),
+    }
+
+
 def _parse_error_body(response: httpx.Response) -> dict[str, Any]:
     """Extract structured fields from an API error body.
 
-    Handles the two envelopes the Khaya API uses::
+    Handles the envelopes the Khaya API uses::
 
+        {"detail": {"error": "...", "message": "...", "details": [...], "request_id": "..."}}
         {"statusCode": 500, "message": "...", "activityId": "..."}
         {"error": {"code": "...", "message": "...", "details": [...]}}
 
-    Falls back to a truncated body snippet for non-JSON responses (e.g. the
-    HTML pages emitted by the API gateway when a backend is unavailable).
+    The first is the platform gateway's; the other two come from the services
+    behind it. Falls back to a truncated body snippet for non-JSON responses
+    (e.g. the HTML pages a proxy emits when a backend is unavailable).
     """
     try:
         body = response.json()
@@ -59,6 +102,9 @@ def _parse_error_body(response: httpx.Response) -> dict[str, Any]:
 
     if not isinstance(body, dict):
         return {"message": str(body)}
+
+    if "detail" in body:
+        return _parse_platform_detail(body["detail"], response.status_code)
 
     parsed: dict[str, Any] = {"activity_id": body.get("activityId")}
 
@@ -84,6 +130,9 @@ def _build_http_exception(response: httpx.Response) -> APIError:
 
     if status == 401:
         return AuthenticationError(message, status, **fields)
+
+    if status == 402:
+        return InsufficientCreditsError(message, status, **fields)
 
     if status == 429:
         retry_after = response.headers.get("Retry-After")
@@ -192,11 +241,13 @@ class BaseApi:
         self.close()
 
     def _prepare_headers(self) -> dict[str, str]:
-        return {
-            "Ocp-Apim-Subscription-Key": self.config.api_key or "",
-            "Content-Type": "application/json",
-            "Cache-Control": "no-cache",
-        }
+        # No Content-Type here: httpx sets application/json for ``json=`` bodies,
+        # and binary uploads must declare their own type.
+        headers = {"Cache-Control": "no-cache"}
+        # Omitted rather than sent as an empty "Bearer " token.
+        if self.config.api_key:
+            headers["Authorization"] = f"Bearer {self.config.api_key}"
+        return headers
 
     def _sync_backoff(self, attempt: int, response: httpx.Response | None = None) -> None:
         delay = _retry_after_delay(response)
@@ -234,8 +285,7 @@ class BaseApi:
             RateLimitError: On 429 after all retries exhausted.
             APIError: On other HTTP errors or transport failures.
         """
-        headers = self._prepare_headers()
-        kwargs.setdefault("headers", headers)
+        kwargs["headers"] = {**self._prepare_headers(), **(kwargs.get("headers") or {})}
         last_exc: APIError | None = None
         total = self.config.retry_attempts
 
@@ -300,8 +350,7 @@ class BaseApi:
             RateLimitError: On 429 after all retries exhausted.
             APIError: On other HTTP errors or transport failures.
         """
-        headers = self._prepare_headers()
-        kwargs.setdefault("headers", headers)
+        kwargs["headers"] = {**self._prepare_headers(), **(kwargs.get("headers") or {})}
         last_exc: APIError | None = None
         total = self.config.retry_attempts
 

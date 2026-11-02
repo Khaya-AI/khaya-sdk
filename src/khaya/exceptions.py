@@ -54,6 +54,13 @@ class RateLimitError(APIError):
     """Error during rate limiting."""
 
 
+class InsufficientCreditsError(APIError):
+    """The account's credit balance cannot cover the request (HTTP 402).
+
+    Not retried: the request will keep failing until the balance is topped up.
+    """
+
+
 class TranslationError(APIError):
     """Error during translation."""
 
