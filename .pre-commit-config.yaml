@@ -1,5 +1,4 @@
-# Keep the ruff, isort and mypy revs in step with the versions in uv.lock, so
-# the hooks and CI agree on what is an error.
+# Keep revs in step with uv.lock.
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.17.3
@@ -7,8 +6,7 @@ repos:
       - id: ruff-check
         args: [--fix]
       - id: ruff-format
-        # Python files only, as in CI: ruff 0.17 would also reformat the code
-        # examples in README.md and docs/.
+        # Skip Markdown code blocks.
         types_or: [python, pyi]
 
   - repo: https://github.com/PyCQA/isort
@@ -32,7 +30,7 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
-        # mkdocs.yml uses a !!python/name tag for the mermaid fence.
+        # For the !!python/name tag in mkdocs.yml.
         args: [--unsafe]
       - id: check-toml
       - id: debug-statements

@@ -4,14 +4,12 @@ Thank you for helping improve the Khaya SDK.
 
 ## Branching strategy
 
-- `main` — always releasable; protected branch. Every release is tagged here.
+- `main` — matches the latest PyPI release. Only release PRs and hotfixes merge here.
 - `dev` — integration branch. All work lands here first.
 - Feature branches: `feature/<short-description>` (e.g. `feature/add-ki-language`).
 - Bug fixes: `fix/<short-description>`.
 - Open a PR against `dev`; at least one review is required before merging.
-- To release: open a PR from `dev` to `main`, bump `version` in `pyproject.toml`
-  and date the `CHANGELOG.md` section, merge, then push a `vX.Y.Z` tag on `main`.
-  The tag runs `.github/workflows/release.yml` (tests → TestPyPI → PyPI → GitHub release).
+- Releases and hotfixes: see [RELEASING.md](RELEASING.md).
 
 ## Commit message format
 

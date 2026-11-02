@@ -67,6 +67,12 @@ jobs:
           fi
           echo "Publishing version ${VERSION}"
 
+      - name: Verify the commit is on main
+        if: github.event_name == 'push' || inputs.target == 'pypi'
+        run: |
+          git merge-base --is-ancestor HEAD origin/main \
+            || { echo "::error::Releases must be tagged on main"; exit 1; }
+
   test:
     name: Test (Python ${{ matrix.python-version }})
     needs: [validate]
@@ -87,7 +93,6 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
-        # --frozen: release exactly what CI tested, not a fresh resolve.
         run: uv sync --frozen --extra test --extra dev
 
       - name: Lint
