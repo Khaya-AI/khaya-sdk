@@ -87,13 +87,16 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv sync --extra test --extra dev
+        # --frozen: release exactly what CI tested, not a fresh resolve.
+        run: uv sync --frozen --extra test --extra dev
 
       - name: Lint
-        run: uv run ruff check src/khaya
+        run: |
+          uv run ruff check src/khaya tests
+          uv run ruff format --check src/khaya tests
 
       - name: Type check
-        run: uv run mypy src/khaya
+        run: uv run mypy src/khaya tests
 
       - name: Unit tests
         run: uv run pytest -m "not integration"
