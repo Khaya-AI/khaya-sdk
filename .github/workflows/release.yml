@@ -218,11 +218,16 @@ jobs:
           fi
 
       # gh CLI, not a marketplace action: this job holds contents: write.
-      - name: Create GitHub Release
+      # release-please already created the release; a hand-pushed tag has none.
+      - name: Attach dist to GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" \
-            --title "khaya ${GITHUB_REF_NAME}" \
-            --notes-file release_notes.md \
-            dist/*
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" dist/* --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              --title "khaya ${GITHUB_REF_NAME}" \
+              --notes-file release_notes.md \
+              dist/*
+          fi
