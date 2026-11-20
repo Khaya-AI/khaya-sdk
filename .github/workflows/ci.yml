@@ -44,9 +44,8 @@ jobs:
       - name: Lint with ruff
         run: uv run ruff check src/khaya tests
 
-      # NOTE: `ruff format --check` is deliberately not enabled yet — nine
-      # files on main are currently unformatted, so the gate would fail on
-      # arrival. See the PR description for the follow-up.
+      - name: Check formatting with ruff
+        run: uv run ruff format --check src/khaya tests
 
       - name: Type-check with mypy
         run: uv run mypy src/khaya tests
