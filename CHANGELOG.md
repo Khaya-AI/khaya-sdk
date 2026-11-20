@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.4.0] - 2026-10-19
-
 Moves the SDK to the new Khaya platform. This is a breaking release (0.4.0):
 the old Azure APIM host and `Ocp-Apim-Subscription-Key` auth no longer work
 with it.
@@ -30,6 +28,7 @@ with it.
 
 ### Added
 
+- `KhayaClient()` reads the key from `KHAYA_API_KEY` when none is passed.
 - `InsufficientCreditsError` (HTTP 402), raised when the account's credit
   balance cannot cover a request. Not retried. The message names the
   balance, the estimated cost and the top-up link.

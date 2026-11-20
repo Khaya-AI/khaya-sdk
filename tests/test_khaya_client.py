@@ -574,6 +574,28 @@ class TestContextManager:
 
 
 # ---------------------------------------------------------------------------
+# API key resolution
+# ---------------------------------------------------------------------------
+
+
+class TestApiKey:
+    def test_reads_key_from_environment(self, monkeypatch, respx_mock):
+        monkeypatch.setenv("KHAYA_API_KEY", "env-key")
+        route = respx_mock.post(TRANSLATE_URL).mock(return_value=httpx.Response(200, json="x"))
+        KhayaClient().translate("Hello", "en-tw")
+        assert route.calls.last.request.headers["Authorization"] == "Bearer env-key"
+
+    def test_explicit_key_beats_environment(self, monkeypatch):
+        monkeypatch.setenv("KHAYA_API_KEY", "env-key")
+        assert KhayaClient("arg-key").config.api_key == "arg-key"
+
+    def test_no_key_anywhere_raises_on_call(self, monkeypatch):
+        monkeypatch.delenv("KHAYA_API_KEY", raising=False)
+        with pytest.raises(AuthenticationError, match="API key is required"):
+            KhayaClient().translate("Hello", "en-tw")
+
+
+# ---------------------------------------------------------------------------
 # Async API
 # ---------------------------------------------------------------------------
 
