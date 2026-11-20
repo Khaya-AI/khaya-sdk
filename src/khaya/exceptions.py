@@ -61,6 +61,33 @@ class InsufficientCreditsError(APIError):
     """
 
 
+class PayloadTooLargeError(APIError):
+    """The request body exceeds the gateway's size limit (HTTP 413).
+
+    The platform error code is ``REQUEST_TOO_LARGE``. Not retried: send less
+    data, for example a shorter audio clip or less text.
+    """
+
+
+class UnsupportedMediaTypeError(APIError):
+    """The request's Content-Type is not accepted by the route (HTTP 415).
+
+    The platform error code is ``UNSUPPORTED_MEDIA_TYPE``. Not retried. ASR
+    takes ``audio/*``, ``video/*`` or ``application/octet-stream``; translation
+    and TTS take ``application/json``. The SDK sets the right type itself, so
+    this points at a custom header or a proxy rewriting the request.
+    """
+
+
+class ServerError(APIError):
+    """The platform failed to handle the request (HTTP 5xx).
+
+    A 500, 502, 503 or 504 is retried with backoff and this is raised once the
+    attempts run out; any other 5xx is raised straight away. Quote
+    ``activity_id`` when reporting it to Khaya support.
+    """
+
+
 class TranslationError(APIError):
     """Error during translation."""
 

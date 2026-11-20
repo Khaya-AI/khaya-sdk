@@ -159,11 +159,29 @@ async def test_sdk_errors_reach_the_model_as_actionable_text(server, tmp_path):
 
     The message must name the valid options so the model can retry correctly.
     """
-    with pytest.raises(Exception, match="male_high"):
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    # mcp 2.1+ hides the message of any exception that is not a ToolError, so
+    # this fails if the server stops translating SDK errors.
+    with pytest.raises(ToolError, match="male_high"):
         await server.call_tool(
             "synthesize",
             {"text": "hi", "output_path": str(tmp_path / "x.wav"), "speaker": "robot"},
         )
+
+
+async def test_api_errors_keep_their_message_and_request_id(server, tmp_path, respx_mock):
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    respx_mock.post(TRANSLATE_URL).mock(
+        return_value=httpx.Response(
+            402,
+            json={"detail": {"error": "INSUFFICIENT_CREDITS", "balance": 1, "request_id": "r-9"}},
+        )
+    )
+    with pytest.raises(ToolError, match="INSUFFICIENT_CREDITS") as exc:
+        await server.call_tool("translate", {"text": "hi"})
+    assert "r-9" in str(exc.value)
 
 
 def test_missing_api_key_fails_at_construction(monkeypatch):

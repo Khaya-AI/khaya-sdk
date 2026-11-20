@@ -20,7 +20,10 @@ flowchart TD
     J --> H
     H -->|401| K([AuthenticationError])
     H -->|402| N([InsufficientCreditsError])
+    H -->|413| P([PayloadTooLargeError])
+    H -->|415| Q([UnsupportedMediaTypeError])
     H -->|429 — retries exhausted| L([RateLimitError])
+    H -->|5xx — retries exhausted| R([ServerError])
     H -->|other error| M([APIError])
 ```
 
@@ -88,7 +91,10 @@ classDiagram
     class APIError
     class AuthenticationError
     class InsufficientCreditsError
+    class PayloadTooLargeError
+    class UnsupportedMediaTypeError
     class RateLimitError
+    class ServerError
     class TranslationError
     class TTSGenerationError
     class ASRTranscriptionError
@@ -103,7 +109,10 @@ classDiagram
 
     APIError <|-- AuthenticationError
     APIError <|-- InsufficientCreditsError
+    APIError <|-- PayloadTooLargeError
+    APIError <|-- UnsupportedMediaTypeError
     APIError <|-- RateLimitError
+    APIError <|-- ServerError
     APIError <|-- TranslationError
     APIError <|-- TTSGenerationError
     APIError <|-- ASRTranscriptionError
@@ -129,8 +138,10 @@ See the [Logging guide](guides/logging.md) for how to enable and configure SDK l
 |-------------|-----------------|
 | 401 | `AuthenticationError` |
 | 402 | `InsufficientCreditsError` (not retried) |
+| 413 | `PayloadTooLargeError` (not retried) |
+| 415 | `UnsupportedMediaTypeError` (not retried) |
 | 429 (retries exhausted) | `RateLimitError` |
-| 500, 502, 503, 504 (retries exhausted) | `APIError` |
+| 500, 502, 503, 504 (retries exhausted), other 5xx | `ServerError` |
 | Network / transport failure (retries exhausted) | `APIError` (status_code=0) |
 | 200 with a non-audio body (TTS) | `TTSGenerationError` |
 | 200 with a non-JSON body (translation, ASR) | `APIError` |
