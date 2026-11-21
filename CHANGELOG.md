@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0](https://github.com/Khaya-AI/khaya-sdk/compare/v0.3.0...v0.4.0) (2026-11-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* move the SDK to the Khaya platform: `api.khaya.ai`, `Authorization: Bearer` auth and the v1 routes; the per-service version settings are removed
+
+### Features
+
+* `KhayaClient()` reads the API key from `KHAYA_API_KEY` when none is passed ([71ca2c1](https://github.com/Khaya-AI/khaya-sdk/commit/71ca2c13e2cfe26aebf7137b255849a355e18118))
+* `result.usage` with the estimated credit cost, rate limit headers and request id ([71ca2c1](https://github.com/Khaya-AI/khaya-sdk/commit/71ca2c13e2cfe26aebf7137b255849a355e18118))
+* move the SDK to the Khaya platform: `api.khaya.ai`, `Authorization: Bearer` auth and the v1 routes; the per-service version settings are removed ([71ca2c1](https://github.com/Khaya-AI/khaya-sdk/commit/71ca2c13e2cfe26aebf7137b255849a355e18118))
+* typed errors for HTTP 402, 413, 415 and 5xx that carry the platform error code, details and request id ([71ca2c1](https://github.com/Khaya-AI/khaya-sdk/commit/71ca2c13e2cfe26aebf7137b255849a355e18118))
+
+
+### Bug Fixes
+
+* **deps:** upgrade PyJWT, certifi, urllib3, httpx2, mcp and other locked packages with security advisories ([71ca2c1](https://github.com/Khaya-AI/khaya-sdk/commit/71ca2c13e2cfe26aebf7137b255849a355e18118))
+* **mcp:** build correct language refresh URLs when `base_url` ends with `/` ([71ca2c1](https://github.com/Khaya-AI/khaya-sdk/commit/71ca2c13e2cfe26aebf7137b255849a355e18118))
+* **mcp:** pass SDK errors to the model as `ToolError`, so mcp 2.1 and later keep the message ([71ca2c1](https://github.com/Khaya-AI/khaya-sdk/commit/71ca2c13e2cfe26aebf7137b255849a355e18118))
+* send ASR uploads with an audio Content-Type instead of `application/json` ([71ca2c1](https://github.com/Khaya-AI/khaya-sdk/commit/71ca2c13e2cfe26aebf7137b255849a355e18118))
+
 ## [Unreleased]
 
 Moves the SDK to the new Khaya platform. This is a breaking release (0.4.0):
