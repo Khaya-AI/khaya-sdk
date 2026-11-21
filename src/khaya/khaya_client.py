@@ -13,18 +13,16 @@ class KhayaClient:
     text-to-speech (TTS) for African languages.
 
     Args:
-        api_key: Your Khaya API key. Required — read it from the
-            ``KHAYA_API_KEY`` environment variable yourself if you keep it
-            there (see the example below).
+        api_key: Your Khaya API key. Defaults to the ``KHAYA_API_KEY``
+            environment variable.
         config: Optional pre-built Settings instance. When provided,
             ``api_key`` is ignored.
 
     Example::
 
-        import os
         from khaya import KhayaClient
 
-        with KhayaClient(os.environ["KHAYA_API_KEY"]) as khaya:
+        with KhayaClient() as khaya:  # reads KHAYA_API_KEY
             result = khaya.translate("Hello", "en-tw")
             print(result.text)
 
@@ -37,10 +35,13 @@ class KhayaClient:
 
     def __init__(
         self,
-        api_key: str,
+        api_key: str | None = None,
         config: Settings | None = None,
     ) -> None:
-        self.config = config if config else Settings(api_key=api_key)
+        if config is None:
+            # Settings(api_key=None) would override KHAYA_API_KEY.
+            config = Settings(api_key=api_key) if api_key is not None else Settings()
+        self.config = config
         self.http_client = BaseApi(self.config)
         self.translation = TranslationService(self.http_client)
         self.asr = AsrService(self.http_client)

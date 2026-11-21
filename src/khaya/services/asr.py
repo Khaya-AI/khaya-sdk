@@ -1,16 +1,30 @@
 import logging
+import mimetypes
 from typing import Any, Literal
 
 import httpx
 
 from khaya.exceptions import ASRTranscriptionError
-from khaya.models import SegmentTiming, Timings, TranscriptionResult, WordTiming
+from khaya.models import SegmentTiming, Timings, TranscriptionResult, Usage, WordTiming
 from khaya.services.base_api import BaseApi, decode_json
 from khaya.utils import check_authentication
 
 logger = logging.getLogger(__name__)
 
 Granularity = Literal["word", "segment"]
+
+
+def _content_type(audio_file_path: str) -> str:
+    """Pick the upload Content-Type from the file extension.
+
+    The gateway accepts only ``audio/*``, ``video/*`` and
+    ``application/octet-stream`` (anything else is a 415), so an extension that
+    maps to some other type, or to none, falls back to the octet-stream.
+    """
+    guessed, _ = mimetypes.guess_type(audio_file_path)
+    if guessed is not None and guessed.startswith(("audio/", "video/")):
+        return guessed
+    return "application/octet-stream"
 
 
 def _read_audio(audio_file_path: str) -> bytes:
@@ -48,12 +62,13 @@ def _timings(raw: dict[str, Any] | None) -> Timings | None:
 def _to_result(response: httpx.Response, language: str) -> TranscriptionResult:
     """Build a result from either shape the API returns.
 
-    v3 and v2 return ``{"text": ..., "warnings": [...], "timings": {...}}``;
-    v1 returns a bare JSON string, so it can carry neither.
+    The API returns ``{"text": ..., "warnings": [...], "timings": {...}}``; a
+    bare JSON string is also accepted and carries neither warnings nor timings.
     """
     body = decode_json(response)
+    usage = Usage.from_headers(response.headers)
     if isinstance(body, str):
-        return TranscriptionResult(text=body, language=language)
+        return TranscriptionResult(text=body, language=language, usage=usage)
 
     warnings = list(body.get("warnings", []))
     for warning in warnings:
@@ -63,6 +78,7 @@ def _to_result(response: httpx.Response, language: str) -> TranscriptionResult:
         language=language,
         warnings=warnings,
         timings=_timings(body.get("timings")),
+        usage=usage,
     )
 
 
@@ -84,7 +100,6 @@ class AsrService:
             audio_file_path: Path to the audio file (.wav).
             language: The spoken language code (e.g. ``"twi"`` for Twi).
             timestamps: Request alignment data — ``"word"`` or ``"segment"``.
-                Requires ASR v2 or later.
 
         Returns:
             TranscriptionResult with the transcribed text, any API warnings,
@@ -100,7 +115,11 @@ class AsrService:
         logger.debug("Transcribing audio file (language=%s, timestamps=%s)", language, timestamps)
         data = _read_audio(audio_file_path)
         response: httpx.Response = self.http_client.request(
-            "POST", self.endpoint, params=params, content=data
+            "POST",
+            self.endpoint,
+            params=params,
+            content=data,
+            headers={"Content-Type": _content_type(audio_file_path)},
         )
         return _to_result(response, language)
 
@@ -116,6 +135,10 @@ class AsrService:
         logger.debug("Transcribing audio file (language=%s, timestamps=%s)", language, timestamps)
         data = _read_audio(audio_file_path)
         response: httpx.Response = await self.http_client.arequest(
-            "POST", self.endpoint, params=params, content=data
+            "POST",
+            self.endpoint,
+            params=params,
+            content=data,
+            headers={"Content-Type": _content_type(audio_file_path)},
         )
         return _to_result(response, language)

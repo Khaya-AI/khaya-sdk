@@ -1,0 +1,37 @@
+name: Release Please
+
+# Keeps a release PR open against main. Merging it bumps the version, updates
+# CHANGELOG.md, and pushes the vX.Y.Z tag that triggers release.yml.
+#
+# Uses a GitHub App token: tags pushed with GITHUB_TOKEN don't trigger other
+# workflows. Needs the RELEASE_PLEASE_APP_ID variable and the
+# RELEASE_PLEASE_PRIVATE_KEY secret.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.RELEASE_PLEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_PRIVATE_KEY }}
+
+      - uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

@@ -15,10 +15,10 @@ from khaya import KhayaClient  # noqa: E402
 from khaya.config import Settings  # noqa: E402
 from khaya.mcp.server import MissingAPIKeyError, build_server  # noqa: E402
 
-BASE_URL = "https://translation-api.ghananlp.org"
-TRANSLATE_URL = f"{BASE_URL}/v1/translate"
-ASR_URL = f"{BASE_URL}/asr/v3/transcribe"
-TTS_URL = f"{BASE_URL}/tts/v1/tts"
+BASE_URL = "https://api.khaya.ai"
+TRANSLATE_URL = f"{BASE_URL}/translate/v1/translate"
+ASR_URL = f"{BASE_URL}/asr/v1/transcribe"
+TTS_URL = f"{BASE_URL}/tts/v1/synthesize"
 WAV_BYTES = b"RIFF$\x00\x00\x00WAVEfmt " + b"\x00" * 24
 AUDIO_HEADERS = {"content-type": "audio/wav"}
 
@@ -142,7 +142,7 @@ async def test_list_languages_uses_bundled_constants_without_network(server):
 
 
 async def test_list_languages_refresh_reads_the_live_catalogue(server, respx_mock):
-    respx_mock.get(f"{BASE_URL}/asr/v3/languages").mock(
+    respx_mock.get(f"{BASE_URL}/asr/v1/languages").mock(
         return_value=httpx.Response(200, json={"languages": [{"code": "twi", "name": "Twi"}]})
     )
     result = await server.call_tool("list_languages", {"service": "asr", "refresh": True})
@@ -159,11 +159,29 @@ async def test_sdk_errors_reach_the_model_as_actionable_text(server, tmp_path):
 
     The message must name the valid options so the model can retry correctly.
     """
-    with pytest.raises(Exception, match="male_high"):
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    # mcp 2.1+ hides the message of any exception that is not a ToolError, so
+    # this fails if the server stops translating SDK errors.
+    with pytest.raises(ToolError, match="male_high"):
         await server.call_tool(
             "synthesize",
             {"text": "hi", "output_path": str(tmp_path / "x.wav"), "speaker": "robot"},
         )
+
+
+async def test_api_errors_keep_their_message_and_request_id(server, tmp_path, respx_mock):
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    respx_mock.post(TRANSLATE_URL).mock(
+        return_value=httpx.Response(
+            402,
+            json={"detail": {"error": "INSUFFICIENT_CREDITS", "balance": 1, "request_id": "r-9"}},
+        )
+    )
+    with pytest.raises(ToolError, match="INSUFFICIENT_CREDITS") as exc:
+        await server.call_tool("translate", {"text": "hi"})
+    assert "r-9" in str(exc.value)
 
 
 def test_missing_api_key_fails_at_construction(monkeypatch):

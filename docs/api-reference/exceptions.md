@@ -1,11 +1,15 @@
 # Exceptions
 
-All exceptions inherit from `APIError` and expose `message` and `status_code` attributes.
+All exceptions inherit from `APIError` and expose `message`, `status_code`, `code`, `details` and `activity_id` attributes.
 
 ```
 APIError
 ├── AuthenticationError
+├── InsufficientCreditsError
+├── PayloadTooLargeError
+├── UnsupportedMediaTypeError
 ├── RateLimitError
+├── ServerError
 ├── TranslationError
 ├── TTSGenerationError
 └── ASRTranscriptionError
@@ -15,7 +19,15 @@ APIError
 
 ::: khaya.exceptions.AuthenticationError
 
+::: khaya.exceptions.InsufficientCreditsError
+
+::: khaya.exceptions.PayloadTooLargeError
+
+::: khaya.exceptions.UnsupportedMediaTypeError
+
 ::: khaya.exceptions.RateLimitError
+
+::: khaya.exceptions.ServerError
 
 ::: khaya.exceptions.TranslationError
 

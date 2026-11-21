@@ -17,16 +17,20 @@ from khaya.exceptions import (
     APIError,
     ASRTranscriptionError,
     AuthenticationError,
+    InsufficientCreditsError,
+    PayloadTooLargeError,
     RateLimitError,
+    ServerError,
     TranslationError,
     TTSGenerationError,
+    UnsupportedMediaTypeError,
 )
-from khaya.models import SynthesisResult, TranscriptionResult, TranslationResult
+from khaya.models import SynthesisResult, TranscriptionResult, TranslationResult, Usage
 
-BASE_URL = "https://translation-api.ghananlp.org"
-TRANSLATE_URL = f"{BASE_URL}/v1/translate"
-TTS_URL = f"{BASE_URL}/tts/v1/tts"
-ASR_URL = f"{BASE_URL}/asr/v3/transcribe"
+BASE_URL = "https://api.khaya.ai"
+TRANSLATE_URL = f"{BASE_URL}/translate/v1/translate"
+TTS_URL = f"{BASE_URL}/tts/v1/synthesize"
+ASR_URL = f"{BASE_URL}/asr/v1/transcribe"
 
 # TTS responses must look like audio or the content-type guard rejects them.
 WAV_BYTES = b"RIFF$\x00\x00\x00WAVEfmt " + b"\x00" * 24
@@ -88,10 +92,160 @@ class TestTranslate:
         with pytest.raises(APIError):
             make_client().translate("Hello", "en-tw")
 
+    def test_platform_object_response_is_parsed(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={"text": "Maakye", "source_language": "eng", "target_language": "twi"},
+            )
+        )
+        result = make_client().translate("Good morning", "eng-twi")
+        assert result.text == "Maakye"
+        assert (result.source_language, result.target_language) == ("eng", "twi")
+
+    def test_unrecognised_response_shape_raises(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(return_value=httpx.Response(200, json={"out": 1}))
+        with pytest.raises(TranslationError, match="Unexpected translation response"):
+            make_client().translate("Hello", "en-tw")
+
+    async def test_async_platform_object_response_is_parsed(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(200, json={"text": "Maakye"})
+        )
+        assert (await make_client().atranslate("Good morning", "eng-twi")).text == "Maakye"
+
+    def test_request_body_uses_the_in_lang_format(self, respx_mock):
+        route = respx_mock.post(TRANSLATE_URL).mock(return_value=httpx.Response(200, json="x"))
+        make_client().translate("Hello", "eng-twi")
+        assert json.loads(route.calls.last.request.content) == {"in": "Hello", "lang": "eng-twi"}
+
 
 # ---------------------------------------------------------------------------
 # ASR
 # ---------------------------------------------------------------------------
+
+
+class TestUsage:
+    GATEWAY_HEADERS = {
+        "X-Estimated-Credit-Cost": "4",
+        "X-RateLimit-Limit-Minute": "60",
+        "X-RateLimit-Remaining-Minute": "59",
+        "X-Khaya-Request-Id": "req-1",
+        "X-Correlation-ID": "corr-1",
+    }
+
+    def test_translate_exposes_usage(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(200, json="Ɛte sɛn?", headers=self.GATEWAY_HEADERS)
+        )
+        usage = make_client().translate("Hello", "en-tw").usage
+        assert usage == Usage(
+            estimated_credit_cost=4,
+            rate_limit_per_minute=60,
+            rate_limit_remaining_minute=59,
+            request_id="req-1",
+            correlation_id="corr-1",
+        )
+
+    def test_synthesize_exposes_usage(self, respx_mock):
+        respx_mock.post(TTS_URL).mock(
+            return_value=httpx.Response(
+                200, content=WAV_BYTES, headers={**AUDIO_HEADERS, **self.GATEWAY_HEADERS}
+            )
+        )
+        assert make_client().synthesize("Hello", "twi").usage.estimated_credit_cost == 4
+
+    def test_transcribe_exposes_usage(self, tmp_path, respx_mock):
+        audio = tmp_path / "a.wav"
+        audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+        respx_mock.post(ASR_URL).mock(
+            return_value=httpx.Response(200, json={"text": "hi"}, headers=self.GATEWAY_HEADERS)
+        )
+        assert make_client().transcribe(str(audio), "twi").usage.request_id == "req-1"
+
+    def test_anonymous_key_reports_free_credits(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(200, json="x", headers={"X-Free-Credits-Remaining": "7"})
+        )
+        usage = make_client().translate("Hello", "en-tw").usage
+        assert usage.free_credits_remaining == 7
+        assert usage.estimated_credit_cost is None
+
+    def test_no_headers_means_no_usage(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(return_value=httpx.Response(200, json="x"))
+        assert make_client().translate("Hello", "en-tw").usage is None
+
+    def test_malformed_number_is_ignored(self):
+        usage = Usage.from_headers({"X-Estimated-Credit-Cost": "n/a", "X-Khaya-Request-Id": "r"})
+        assert usage.estimated_credit_cost is None
+        assert usage.request_id == "r"
+
+
+class TestRequestHeaders:
+    """The platform authenticates with a Bearer token and 415s a wrong upload type."""
+
+    def test_api_key_is_sent_as_a_bearer_token(self, respx_mock):
+        route = respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(200, json="Me ho yɛ")
+        )
+        make_client(api_key="secret-key").translate("How are you", "en-tw")
+        headers = route.calls.last.request.headers
+        assert headers["authorization"] == "Bearer secret-key"
+        assert "ocp-apim-subscription-key" not in headers
+
+    def test_no_authorization_header_without_a_key(self, respx_mock):
+        """Unkeyed calls (the public catalogues) must not send an empty Bearer token."""
+        route = respx_mock.get(f"{BASE_URL}/tts/v1/languages").mock(
+            return_value=httpx.Response(200, json={"languages": {}})
+        )
+        make_client(api_key="").http_client.request("GET", f"{BASE_URL}/tts/v1/languages")
+        assert "authorization" not in route.calls.last.request.headers
+
+    def test_explicit_none_headers_are_tolerated(self, respx_mock):
+        route = respx_mock.post(TRANSLATE_URL).mock(return_value=httpx.Response(200, json="x"))
+        make_client().http_client.request("POST", TRANSLATE_URL, json={}, headers=None)
+        assert route.calls.last.request.headers["authorization"] == "Bearer test-api-key"
+
+    async def test_async_explicit_none_headers_are_tolerated(self, respx_mock):
+        route = respx_mock.post(TRANSLATE_URL).mock(return_value=httpx.Response(200, json="x"))
+        await make_client().http_client.arequest("POST", TRANSLATE_URL, json={}, headers=None)
+        assert route.calls.last.request.headers["authorization"] == "Bearer test-api-key"
+
+    def test_json_requests_still_declare_json(self, respx_mock):
+        route = respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(200, json="Me ho yɛ")
+        )
+        make_client().translate("How are you", "en-tw")
+        assert route.calls.last.request.headers["content-type"] == "application/json"
+
+    @pytest.mark.parametrize(
+        ("filename", "expected"),
+        [
+            ("clip.wav", "audio/"),
+            ("clip.mp3", "audio/"),
+            ("clip.mp4", "video/"),
+            ("clip.unknownext", "application/octet-stream"),
+            ("clip.txt", "application/octet-stream"),
+            ("clip", "application/octet-stream"),
+        ],
+    )
+    def test_asr_upload_declares_a_type_the_gateway_accepts(
+        self, respx_mock, tmp_path, filename, expected
+    ):
+        audio = tmp_path / filename
+        audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+        route = respx_mock.post(ASR_URL).mock(return_value=httpx.Response(200, json="me ho ye"))
+        make_client().transcribe(str(audio), "twi")
+        request = route.calls.last.request
+        assert request.headers["content-type"].startswith(expected)
+        assert request.headers["authorization"] == "Bearer test-api-key"
+
+    async def test_async_asr_upload_declares_a_type_the_gateway_accepts(self, respx_mock, tmp_path):
+        audio = tmp_path / "clip.wav"
+        audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+        route = respx_mock.post(ASR_URL).mock(return_value=httpx.Response(200, json="me ho ye"))
+        await make_client().atranscribe(str(audio), "twi")
+        assert route.calls.last.request.headers["content-type"].startswith("audio/")
 
 
 class TestTranscribe:
@@ -148,14 +302,11 @@ class TestTranscribe:
         assert result.warnings == ["'tw' is a legacy code."]
 
     def test_v1_bare_string_still_parses(self, respx_mock, tmp_path):
-        """asr_version="v1" returns a bare JSON string, carrying no envelope."""
+        """A bare JSON string body is still accepted, carrying no envelope."""
         audio = tmp_path / "test.wav"
         audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
-        config = Settings(api_key="k", retry_attempts=1, asr_version="v1")
-        respx_mock.post(f"{BASE_URL}/asr/v1/transcribe").mock(
-            return_value=httpx.Response(200, json="Me ho yɛ.")
-        )
-        result = KhayaClient(api_key="k", config=config).transcribe(str(audio), "twi")
+        respx_mock.post(ASR_URL).mock(return_value=httpx.Response(200, json="Me ho yɛ."))
+        result = make_client().transcribe(str(audio), "twi")
         assert result.text == "Me ho yɛ."
         assert result.warnings == []
 
@@ -420,6 +571,28 @@ class TestContextManager:
         async with KhayaClient("test-api-key") as client:
             result = await client.atranslate("Hello", "en-tw")
         assert result.text == "Ɛte sɛn?"
+
+
+# ---------------------------------------------------------------------------
+# API key resolution
+# ---------------------------------------------------------------------------
+
+
+class TestApiKey:
+    def test_reads_key_from_environment(self, monkeypatch, respx_mock):
+        monkeypatch.setenv("KHAYA_API_KEY", "env-key")
+        route = respx_mock.post(TRANSLATE_URL).mock(return_value=httpx.Response(200, json="x"))
+        KhayaClient().translate("Hello", "en-tw")
+        assert route.calls.last.request.headers["Authorization"] == "Bearer env-key"
+
+    def test_explicit_key_beats_environment(self, monkeypatch):
+        monkeypatch.setenv("KHAYA_API_KEY", "env-key")
+        assert KhayaClient("arg-key").config.api_key == "arg-key"
+
+    def test_no_key_anywhere_raises_on_call(self, monkeypatch):
+        monkeypatch.delenv("KHAYA_API_KEY", raising=False)
+        with pytest.raises(AuthenticationError, match="API key is required"):
+            KhayaClient().translate("Hello", "en-tw")
 
 
 # ---------------------------------------------------------------------------
@@ -822,3 +995,224 @@ class TestNoClientSideLanguageValidation:
         with warnings.catch_warnings():
             warnings.simplefilter("error")
             make_client().synthesize("Hello", "xx")
+
+
+# ---------------------------------------------------------------------------
+# Platform gateway error envelope: {"detail": {"error": ..., ...}}
+# ---------------------------------------------------------------------------
+
+
+class TestPlatformErrorEnvelope:
+    def test_invalid_key(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(
+                401,
+                json={
+                    "detail": {
+                        "error": "INVALID_API_KEY",
+                        "message": "API key not found or revoked",
+                    }
+                },
+            )
+        )
+        with pytest.raises(AuthenticationError) as exc:
+            make_client().translate("Hello", "en-tw")
+        assert exc.value.code == "INVALID_API_KEY"
+        assert exc.value.message == "API key not found or revoked"
+
+    def test_code_stands_in_for_a_missing_message(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(401, json={"detail": {"error": "EMPTY_API_KEY"}})
+        )
+        with pytest.raises(AuthenticationError) as exc:
+            make_client().translate("Hello", "en-tw")
+        assert exc.value.message == "EMPTY_API_KEY"
+
+    def test_validation_details_and_request_id(self, respx_mock):
+        respx_mock.post(TTS_URL).mock(
+            return_value=httpx.Response(
+                422,
+                json={
+                    "detail": {
+                        "error": "VALIDATION_FAILED",
+                        "message": "The request payload contains invalid parameters.",
+                        "details": [
+                            {
+                                "code": "MISSING_LANGUAGE",
+                                "message": "No language selected",
+                                "target": "language",
+                            }
+                        ],
+                        "request_id": "req-123",
+                    }
+                },
+            )
+        )
+        with pytest.raises(APIError) as exc:
+            make_client().synthesize("Hello", "twi")
+        err = exc.value
+        assert err.status_code == 422
+        assert err.code == "VALIDATION_FAILED"
+        assert err.details[0]["target"] == "language"
+        assert err.activity_id == "req-123"
+        assert "language: No language selected" in str(err)
+
+    def test_insufficient_credits(self, respx_mock):
+        route = respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(
+                402,
+                json={
+                    "detail": {
+                        "error": "INSUFFICIENT_CREDITS",
+                        "balance": 3,
+                        "estimated_cost": 10,
+                        "top_up_url": "https://khaya.ai/billing",
+                    }
+                },
+            )
+        )
+        with pytest.raises(InsufficientCreditsError) as exc:
+            make_client(retry_attempts=3).translate("Hello", "en-tw")
+        assert exc.value.code == "INSUFFICIENT_CREDITS"
+        assert "balance 3" in exc.value.message
+        assert "~10" in exc.value.message
+        assert "https://khaya.ai/billing" in exc.value.message
+        assert route.call_count == 1  # topping up is the only fix; retrying is not
+
+    def test_insufficient_credits_is_an_api_error(self):
+        assert issubclass(InsufficientCreditsError, APIError)
+
+    def test_payload_too_large(self, tmp_path, respx_mock):
+        audio = tmp_path / "big.wav"
+        audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+        route = respx_mock.post(ASR_URL).mock(
+            return_value=httpx.Response(
+                413,
+                json={
+                    "detail": {
+                        "error": "REQUEST_TOO_LARGE",
+                        "message": "Request body exceeds the maximum allowed size",
+                    }
+                },
+                headers={"X-Khaya-Request-Id": "req-413"},
+            )
+        )
+        with pytest.raises(PayloadTooLargeError) as exc:
+            make_client(retry_attempts=3).transcribe(str(audio), "twi")
+        assert exc.value.status_code == 413
+        assert exc.value.code == "REQUEST_TOO_LARGE"
+        assert exc.value.activity_id == "req-413"  # from the header; the body has none
+        assert route.call_count == 1
+
+    def test_unsupported_media_type_is_typed_and_not_retried(self, respx_mock):
+        route = respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(
+                415,
+                json={
+                    "detail": {
+                        "error": "UNSUPPORTED_MEDIA_TYPE",
+                        "message": "Content-Type must be application/json",
+                        "request_id": "req-415",
+                    }
+                },
+            )
+        )
+        with pytest.raises(UnsupportedMediaTypeError) as exc:
+            make_client(retry_attempts=3).translate("Hello", "en-tw")
+        assert exc.value.status_code == 415
+        assert exc.value.code == "UNSUPPORTED_MEDIA_TYPE"
+        assert exc.value.activity_id == "req-415"
+        assert route.call_count == 1
+
+    def test_server_error_is_retried_then_typed(self, monkeypatch, respx_mock):
+        monkeypatch.setattr("khaya.services.base_api.time.sleep", lambda _: None)
+        route = respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(
+                503, json={"detail": {"error": "SYSTEM_ERROR", "request_id": "req-503"}}
+            )
+        )
+        with pytest.raises(ServerError) as exc:
+            make_client(retry_attempts=2).translate("Hello", "en-tw")
+        assert exc.value.status_code == 503
+        assert exc.value.code == "SYSTEM_ERROR"
+        assert exc.value.activity_id == "req-503"
+        assert route.call_count == 2
+
+    @pytest.mark.parametrize("cls", [PayloadTooLargeError, UnsupportedMediaTypeError, ServerError])
+    def test_new_errors_are_api_errors(self, cls):
+        assert issubclass(cls, APIError)
+
+    def test_new_errors_are_exported(self):
+        import khaya
+
+        for name in ("PayloadTooLargeError", "UnsupportedMediaTypeError", "ServerError", "Usage"):
+            assert name in khaya.__all__
+            assert hasattr(khaya, name)
+
+    def test_rate_limit(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(
+                429,
+                json={
+                    "detail": {
+                        "error": "RATE_LIMIT_EXCEEDED",
+                        "violated_limit": "rate_limit_per_minute",
+                        "retry_after_seconds": 12,
+                    }
+                },
+                headers={"Retry-After": "12"},
+            )
+        )
+        with pytest.raises(RateLimitError) as exc:
+            make_client().translate("Hello", "en-tw")
+        assert exc.value.code == "RATE_LIMIT_EXCEEDED"
+        assert exc.value.message == "Rate limit exceeded: rate_limit_per_minute (Retry-After: 12s)"
+        assert "Retry-After: 12s" in exc.value.message
+
+    @pytest.mark.parametrize("code", ["ROUTE_NOT_ALLOWED", "SIGNUP_REQUIRED"])
+    def test_forbidden(self, respx_mock, code):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(403, json={"detail": {"error": code, "message": "no"}})
+        )
+        with pytest.raises(APIError) as exc:
+            make_client().translate("Hello", "en-tw")
+        assert (exc.value.status_code, exc.value.code) == (403, code)
+
+    def test_unsupported_media_type(self, respx_mock, tmp_path):
+        audio = tmp_path / "clip.wav"
+        audio.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+        respx_mock.post(ASR_URL).mock(
+            return_value=httpx.Response(
+                415,
+                json={
+                    "detail": {
+                        "error": "UNSUPPORTED_MEDIA_TYPE",
+                        "message": "Content-Type must be audio/*, video/*, or application/octet-stream",
+                    }
+                },
+            )
+        )
+        with pytest.raises(UnsupportedMediaTypeError) as exc:
+            make_client().transcribe(str(audio), "twi")
+        assert exc.value.code == "UNSUPPORTED_MEDIA_TYPE"
+
+    def test_string_detail(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(404, json={"detail": "Not Found"})
+        )
+        with pytest.raises(APIError) as exc:
+            make_client().translate("Hello", "en-tw")
+        assert (exc.value.status_code, exc.value.message) == (404, "Not Found")
+
+    def test_upstream_502_is_retried(self, respx_mock, monkeypatch):
+        monkeypatch.setattr("time.sleep", lambda _: None)
+        route = respx_mock.post(TRANSLATE_URL).mock(
+            side_effect=[
+                httpx.Response(
+                    502, json={"detail": {"error": "UPSTREAM_ERROR", "request_id": "r1"}}
+                ),
+                httpx.Response(200, json="Maakye"),
+            ]
+        )
+        assert make_client(retry_attempts=2).translate("Hello", "en-tw").text == "Maakye"
+        assert route.call_count == 2

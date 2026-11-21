@@ -3,7 +3,7 @@ import logging
 import httpx
 
 from khaya.exceptions import TranslationError
-from khaya.models import TranslationResult
+from khaya.models import TranslationResult, Usage
 from khaya.services.base_api import BaseApi, decode_json
 from khaya.utils import check_authentication
 
@@ -15,6 +15,23 @@ def _parse_language_pair(language_pair: str) -> tuple[str, str]:
     if len(parts) == 2:
         return parts[0], parts[1]
     return parts[0], ""
+
+
+def _translated_text(response: httpx.Response) -> str:
+    """Read the translation from either shape the API returns.
+
+    A ``{"in", "lang"}`` request (what the SDK sends) gets a bare string; the
+    newer ``{"text", "source_language", "target_language"}`` format gets
+    ``{"text": ..., ...}``. Both are accepted so either request format works.
+    """
+    body = decode_json(response)
+    if isinstance(body, str):
+        return body
+    if isinstance(body, dict) and isinstance(body.get("text"), str):
+        return body["text"]
+    raise TranslationError(
+        f"Unexpected translation response: {str(body)[:200]}", response.status_code
+    )
 
 
 class TranslationService:
@@ -47,7 +64,10 @@ class TranslationService:
             "POST", self.endpoint, json={"in": text, "lang": language_pair}
         )
         return TranslationResult(
-            text=decode_json(response), source_language=source, target_language=target
+            text=_translated_text(response),
+            source_language=source,
+            target_language=target,
+            usage=Usage.from_headers(response.headers),
         )
 
     @check_authentication
@@ -61,5 +81,8 @@ class TranslationService:
             "POST", self.endpoint, json={"in": text, "lang": language_pair}
         )
         return TranslationResult(
-            text=decode_json(response), source_language=source, target_language=target
+            text=_translated_text(response),
+            source_language=source,
+            target_language=target,
+            usage=Usage.from_headers(response.headers),
         )

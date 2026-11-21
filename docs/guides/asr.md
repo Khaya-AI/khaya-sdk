@@ -20,6 +20,8 @@ The second argument is the **language code** of the spoken language in the audio
 |-----------|------|-------------|
 | `text` | `str` | The transcribed string |
 | `language` | `str` | Language code of the audio (e.g. `"twi"`) |
+| `warnings` | `list[str]` | Advisories from the API, e.g. a legacy language code (see below) |
+| `timings` | `Timings \| None` | Word or segment offsets when `timestamps` is set, else `None` |
 
 ## Warnings from the API
 
@@ -53,12 +55,6 @@ for word in result.timings.words:
 `timestamps="segment"` populates `result.timings.segments` instead, each with
 `text`, `start` and `end`. Offsets are in seconds. Without `timestamps`,
 `result.timings` is `None`.
-
-## API version
-
-The SDK calls ASR v3. v1 returns a bare string and supports neither warnings
-nor timings; pin it with `Settings(asr_version="v1")` if you need the old
-behaviour.
 
 ## Supported languages
 

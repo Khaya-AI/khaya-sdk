@@ -4,7 +4,7 @@ import httpx
 
 from khaya.constants import SUPPORTED_TTS_SPEAKERS
 from khaya.exceptions import TTSGenerationError
-from khaya.models import SynthesisResult
+from khaya.models import SynthesisResult, Usage
 from khaya.services.base_api import BaseApi
 from khaya.utils import check_authentication
 
@@ -43,7 +43,11 @@ def _audio_from(response: httpx.Response, language: str) -> SynthesisResult:
             f"Expected audio but received {content_type or 'an unknown content type'!r}: {snippet}",
             response.status_code,
         )
-    return SynthesisResult(audio=response.content, language=language)
+    return SynthesisResult(
+        audio=response.content,
+        language=language,
+        usage=Usage.from_headers(response.headers),
+    )
 
 
 class TtsService:
