@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.0](https://github.com/Khaya-AI/khaya-sdk/compare/v0.3.0...v0.4.0) (2026-11-21)
 
 Moves the SDK to the new Khaya platform. This is a breaking release (0.4.0):
 the old Azure APIM host and `Ocp-Apim-Subscription-Key` auth no longer work
@@ -68,6 +68,8 @@ with it.
 - ASR uploads were sent as `application/json`, which the gateway rejects with
   `415 UNSUPPORTED_MEDIA_TYPE`. The upload now declares `audio/*` or `video/*`
   from the file extension, falling back to `application/octet-stream`.
+- Locked dependencies with security advisories are upgraded: PyJWT,
+  certifi, urllib3, httpx2, mcp 2.3.0 and others.
 
 ### Migration from 0.3.x
 
