@@ -35,7 +35,9 @@ def integration_client():
     api_key = os.environ.get("KHAYA_API_KEY")
     if not api_key:
         pytest.skip("KHAYA_API_KEY environment variable not set")
-    with KhayaClient(api_key) as client:
+    # The suite outpaces the key's per-minute limit, and 429s carry no
+    # Retry-After. Seven attempts back off ~63s, past one rate-limit window.
+    with KhayaClient(config=Settings(api_key=api_key, retry_attempts=7)) as client:
         yield client
 
 
@@ -107,7 +109,20 @@ def test_iso_language_code_produces_no_warning(integration_client):
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("granularity", ["word", "segment"])
+@pytest.mark.parametrize(
+    "granularity",
+    [
+        "word",
+        pytest.param(
+            "segment",
+            # strict: an XPASS fails the run, so the marker gets removed once fixed.
+            marks=pytest.mark.xfail(
+                reason="API bug since 2026-10-28: segment timings come back with start == end == 0.0",
+                strict=True,
+            ),
+        ),
+    ],
+)
 def test_timestamps_return_alignment_data(integration_client, granularity):
     result = integration_client.transcribe(str(AUDIO_FIXTURE), "twi", timestamps=granularity)
     assert result.timings is not None
