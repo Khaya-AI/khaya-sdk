@@ -7,8 +7,13 @@ All errors in the Khaya SDK are raised as exceptions — never returned as error
 ```
 Exception
 └── APIError                  # base class for all Khaya errors
+    ├── APIConnectionError    # no response — refused connection, DNS failure
+    │   └── APITimeoutError   # the request timed out
+    ├── BadRequestError       # 400, 422 — the API rejected a parameter
     ├── AuthenticationError   # 401 — invalid or missing API key
     ├── InsufficientCreditsError  # 402 — credit balance too low for the request
+    ├── PermissionDeniedError # 403 — the key may not do this
+    ├── NotFoundError         # 404 — no such route; check base_url
     ├── PayloadTooLargeError  # 413 — request body over the size limit
     ├── UnsupportedMediaTypeError  # 415 — Content-Type not accepted
     ├── RateLimitError        # 429 — too many requests
@@ -23,7 +28,7 @@ All exceptions expose these attributes:
 | Attribute | Type | Description |
 |-----------|------|-------------|
 | `message` | `str` | Human-readable error description |
-| `status_code` | `int` | HTTP status code (0 for transport errors) |
+| `status_code` | `int` | HTTP status code (0 when there was no response) |
 | `code` | `str \| None` | Machine-readable API error code, e.g. `"VALIDATION_FAILED"` |
 | `details` | `list[dict]` | Per-field details, each with `code`, `message`, and `target` |
 | `activity_id` | `str \| None` | Server-side correlation ID (the platform's `request_id`, or the `X-Khaya-Request-Id` header when the body has none) — quote this when reporting a problem |
@@ -33,16 +38,16 @@ All exceptions expose these attributes:
 ### Using the structured fields
 
 ```python
-from khaya.exceptions import APIError
+from khaya.exceptions import APIError, BadRequestError
 
 try:
     khaya.translate("Hello", "en-zz")
+except BadRequestError as e:
+    for detail in e.details:
+        print(f"{detail['target']}: {detail['message']}")
+    # language_pair: Language combination en-zz cannot be used
 except APIError as e:
-    if e.code == "VALIDATION_FAILED":
-        for detail in e.details:
-            print(f"{detail['target']}: {detail['message']}")
-        # language_pair: Language combination en-zz cannot be used
-    elif e.activity_id:
+    if e.activity_id:
         # Server-side failure — include this ID in a support request
         print(f"Khaya failure, activityId={e.activity_id}")
 ```
@@ -79,8 +84,13 @@ All exceptions are available directly from `khaya`:
 ```python
 from khaya import (
     APIError,
+    APIConnectionError,
+    APITimeoutError,
+    BadRequestError,
     AuthenticationError,
     InsufficientCreditsError,
+    PermissionDeniedError,
+    NotFoundError,
     PayloadTooLargeError,
     UnsupportedMediaTypeError,
     RateLimitError,
@@ -120,6 +130,7 @@ try:
     result = khaya.translate("Hello", "en-tw")
 except RateLimitError as e:
     print(f"Still rate limited after retries: {e.message}")
+    print(e.retry_after)  # seconds from the Retry-After header, or None
 ```
 
 ### Out of credits
@@ -172,19 +183,22 @@ you contact support.
 
 ### Key not allowed on a route
 
-A key restricted to some services gets a 403 `APIError` with
+A key restricted to some services gets a `PermissionDeniedError` (403) with
 `code == "ROUTE_NOT_ALLOWED"` on the others. Free anonymous keys that have used
 their allowance get `code == "SIGNUP_REQUIRED"`.
 
 ### Transport failures
 
-Connection failures (refused, DNS, connect timeout) are retried automatically. A request that times out after it was sent is not, because the API may still have processed and billed it. Both end in an `APIError` with `status_code=0`:
+Connection failures (refused, DNS, connect timeout) are retried automatically. A request that times out after it was sent is not, because the API may still have processed and billed it. Both have `status_code=0`:
 
 ```python
-except APIError as e:
-    if e.status_code == 0:
-        print("Network error — check your connection.")
+except APITimeoutError:
+    print("Timed out — pass a longer timeout=, e.g. for long audio.")
+except APIConnectionError:
+    print("Network error — check your connection.")
 ```
+
+`APITimeoutError` is a subclass of `APIConnectionError`, so catch it first.
 
 ## Retry behaviour
 

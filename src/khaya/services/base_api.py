@@ -11,10 +11,15 @@ import httpx
 
 from khaya.config import Settings
 from khaya.exceptions import (
+    APIConnectionError,
     APIError,
+    APITimeoutError,
     AuthenticationError,
+    BadRequestError,
     InsufficientCreditsError,
+    NotFoundError,
     PayloadTooLargeError,
+    PermissionDeniedError,
     RateLimitError,
     ServerError,
     UnsupportedMediaTypeError,
@@ -134,6 +139,26 @@ def _parse_error_body(response: httpx.Response) -> dict[str, Any]:
     return parsed
 
 
+_STATUS_ERRORS: dict[int, type[APIError]] = {
+    400: BadRequestError,
+    401: AuthenticationError,
+    402: InsufficientCreditsError,
+    403: PermissionDeniedError,
+    404: NotFoundError,
+    413: PayloadTooLargeError,
+    415: UnsupportedMediaTypeError,
+    422: BadRequestError,
+}
+
+
+def _seconds(value: str | None) -> float | None:
+    """Parse a Retry-After in seconds. None for an HTTP-date or junk."""
+    try:
+        return max(float(value), 0.0) if value else None
+    except ValueError:
+        return None
+
+
 def _build_http_exception(response: httpx.Response) -> APIError:
     """Map an HTTP error response to the appropriate APIError subclass."""
     status = response.status_code
@@ -146,28 +171,16 @@ def _build_http_exception(response: httpx.Response) -> APIError:
             "X-Correlation-ID"
         )
 
-    if status == 401:
-        return AuthenticationError(message, status, **fields)
-
-    if status == 402:
-        return InsufficientCreditsError(message, status, **fields)
-
-    if status == 413:
-        return PayloadTooLargeError(message, status, **fields)
-
-    if status == 415:
-        return UnsupportedMediaTypeError(message, status, **fields)
-
     if status == 429:
         retry_after = response.headers.get("Retry-After")
         if retry_after:
             message = f"{message} (Retry-After: {retry_after}s)"
-        return RateLimitError(message, status, **fields)
+        return RateLimitError(message, status, retry_after=_seconds(retry_after), **fields)
 
     if 500 <= status <= 599:
         return ServerError(message, status, **fields)
 
-    return APIError(message, status, **fields)
+    return _STATUS_ERRORS.get(status, APIError)(message, status, **fields)
 
 
 def decode_json(response: httpx.Response) -> Any:
@@ -201,13 +214,9 @@ def _retry_after_delay(response: httpx.Response | None) -> float | None:
     """Return the capped Retry-After delay, or None if absent/unparseable."""
     if response is None:
         return None
-    retry_after = response.headers.get("Retry-After")
-    if not retry_after:
-        return None
-    try:
-        delay = float(retry_after)
-    except (ValueError, TypeError):
-        # Retry-After may also be an HTTP-date; fall back to exponential backoff.
+    # Retry-After may also be an HTTP-date; fall back to exponential backoff.
+    delay = _seconds(response.headers.get("Retry-After"))
+    if delay is None:
         return None
     if delay > MAX_RETRY_AFTER_SECONDS:
         logger.debug(
@@ -216,12 +225,18 @@ def _retry_after_delay(response: httpx.Response | None) -> float | None:
             MAX_RETRY_AFTER_SECONDS,
         )
         return MAX_RETRY_AFTER_SECONDS
-    return max(delay, 0.0)
+    return delay
+
+
+def _connection_error(e: httpx.TransportError) -> APIConnectionError:
+    # A connect or pool timeout that outlasted the retries. Nothing was sent.
+    kind = APITimeoutError if isinstance(e, httpx.TimeoutException) else APIConnectionError
+    return kind(f"Transport error: {e}", 0)
 
 
 def _timeout_message(timeout: float) -> str:
     return (
-        f"Request timed out after {timeout}s and was not retried, because the "
+        f"Request timed out after {timeout:g}s and was not retried, because the "
         "API may still have processed and billed it. Raise Settings.timeout "
         "for long audio or text."
     )
@@ -332,21 +347,30 @@ class BaseApi:
         Args:
             method: HTTP method ('GET', 'POST', etc.).
             url: The URL to request.
-            **kwargs: Additional arguments forwarded to httpx.
+            **kwargs: Additional arguments forwarded to httpx. ``timeout``
+                overrides ``Settings.timeout`` for this request.
 
         Returns:
             httpx.Response on success.
 
         Raises:
+            BadRequestError: On 400 or 422.
             AuthenticationError: On 401.
             InsufficientCreditsError: On 402.
+            PermissionDeniedError: On 403.
+            NotFoundError: On 404.
             PayloadTooLargeError: On 413.
             UnsupportedMediaTypeError: On 415.
             RateLimitError: On 429 after all retries exhausted.
             ServerError: On 5xx after all retries exhausted.
-            APIError: On other HTTP errors or transport failures.
+            APITimeoutError: On a timeout.
+            APIConnectionError: On other transport failures.
+            APIError: On any other HTTP error.
         """
         kwargs["headers"] = {**self._prepare_headers(), **(kwargs.get("headers") or {})}
+        # httpx reads timeout=None as "wait forever", not "use the default".
+        if kwargs.get("timeout") is None:
+            kwargs.pop("timeout", None)
         last_exc: APIError | None = None
         total = self.config.retry_attempts
 
@@ -379,7 +403,7 @@ class BaseApi:
             except _AMBIGUOUS_TIMEOUTS as e:
                 logger.warning("Timed out, not retrying: %s %s", method, url)
                 timeout = kwargs.get("timeout", self.config.timeout)
-                raise APIError(_timeout_message(timeout), 0) from e
+                raise APITimeoutError(_timeout_message(timeout), 0) from e
             except httpx.TransportError as e:
                 if attempt < total - 1:
                     logger.warning(
@@ -393,7 +417,7 @@ class BaseApi:
                     self._sync_backoff(attempt)
                     continue
                 logger.warning("Transport error on final attempt: %s %s — %s", method, url, e)
-                raise APIError(f"Transport error: {e}", 0) from e
+                raise _connection_error(e) from e
 
         if last_exc is not None:  # pragma: no cover
             raise last_exc
@@ -405,21 +429,30 @@ class BaseApi:
         Args:
             method: HTTP method ('GET', 'POST', etc.).
             url: The URL to request.
-            **kwargs: Additional arguments forwarded to httpx.
+            **kwargs: Additional arguments forwarded to httpx. ``timeout``
+                overrides ``Settings.timeout`` for this request.
 
         Returns:
             httpx.Response on success.
 
         Raises:
+            BadRequestError: On 400 or 422.
             AuthenticationError: On 401.
             InsufficientCreditsError: On 402.
+            PermissionDeniedError: On 403.
+            NotFoundError: On 404.
             PayloadTooLargeError: On 413.
             UnsupportedMediaTypeError: On 415.
             RateLimitError: On 429 after all retries exhausted.
             ServerError: On 5xx after all retries exhausted.
-            APIError: On other HTTP errors or transport failures.
+            APITimeoutError: On a timeout.
+            APIConnectionError: On other transport failures.
+            APIError: On any other HTTP error.
         """
         kwargs["headers"] = {**self._prepare_headers(), **(kwargs.get("headers") or {})}
+        # httpx reads timeout=None as "wait forever", not "use the default".
+        if kwargs.get("timeout") is None:
+            kwargs.pop("timeout", None)
         last_exc: APIError | None = None
         total = self.config.retry_attempts
 
@@ -452,7 +485,7 @@ class BaseApi:
             except _AMBIGUOUS_TIMEOUTS as e:
                 logger.warning("Timed out, not retrying: %s %s", method, url)
                 timeout = kwargs.get("timeout", self.config.timeout)
-                raise APIError(_timeout_message(timeout), 0) from e
+                raise APITimeoutError(_timeout_message(timeout), 0) from e
             except httpx.TransportError as e:
                 if attempt < total - 1:
                     logger.warning(
@@ -466,7 +499,7 @@ class BaseApi:
                     await self._async_backoff(attempt)
                     continue
                 logger.warning("Transport error on final attempt: %s %s — %s", method, url, e)
-                raise APIError(f"Transport error: {e}", 0) from e
+                raise _connection_error(e) from e
 
         if last_exc is not None:  # pragma: no cover
             raise last_exc

@@ -1,3 +1,4 @@
+import httpx
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -12,6 +13,9 @@ API_ENDPOINTS: dict[str, str] = {
 }
 
 
+_LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
 class Settings(BaseSettings):
     """Runtime configuration for `KhayaClient`.
 
@@ -20,15 +24,17 @@ class Settings(BaseSettings):
 
     Attributes:
         api_key: Sent as an ``Authorization: Bearer`` token.
-        base_url: API root. Must be HTTPS.
-        timeout: Per-request timeout in seconds.
+        base_url: API root. Must be HTTPS, except for a server on this
+            machine (``http://localhost``), for local mocks.
+        timeout: Default per-request timeout in seconds. Each client method
+            also takes a ``timeout`` for one call.
         retry_attempts: Total attempts per request, including the first.
     """
 
     # repr=False keeps the key out of logs and tracebacks that print Settings.
     api_key: str | None = Field(default=None, repr=False)
     base_url: str = "https://api.khaya.ai"
-    timeout: int = Field(default=TIMEOUT, gt=0)
+    timeout: float = Field(default=TIMEOUT, gt=0)
     # retry_attempts=0 would skip the request entirely.
     retry_attempts: int = Field(default=RETRY_ATTEMPTS, ge=1)
     # Prefixed, so a BASE_URL set for an unrelated app cannot redirect the
@@ -38,9 +44,12 @@ class Settings(BaseSettings):
     @field_validator("base_url")
     @classmethod
     def base_url_must_use_https(cls, v: str) -> str:
-        if not v.startswith("https://"):
-            raise ValueError("HTTPS is required for base_url")
-        return v
+        # Plain HTTP would send the API key in the clear, so it is allowed
+        # only where the request never leaves this machine.
+        local = v.startswith("http://") and httpx.URL(v).host in _LOOPBACK_HOSTS
+        if v.startswith("https://") or local:
+            return v
+        raise ValueError("HTTPS is required for base_url (http is allowed for localhost only)")
 
     @property
     def endpoints(self) -> dict[str, str]:

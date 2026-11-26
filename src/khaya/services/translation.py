@@ -10,7 +10,10 @@ from khaya.utils import check_authentication
 logger = logging.getLogger(__name__)
 
 
-def _parse_language_pair(language_pair: str) -> tuple[str, str]:
+def _parse_language_pair(text: str, language_pair: str) -> tuple[str, str]:
+    # .strip(): whitespace-only text is billed for nothing.
+    if not isinstance(text, str) or not text.strip() or not language_pair:
+        raise TranslationError("Text and language pair are required", 400)
     parts = language_pair.split("-", 1)
     if len(parts) == 2:
         return parts[0], parts[1]
@@ -40,12 +43,16 @@ class TranslationService:
         self.endpoint = http_client.config.endpoints["translation"]
 
     @check_authentication
-    def translate(self, text: str, language_pair: str = "en-tw") -> TranslationResult:
+    def translate(
+        self, text: str, language_pair: str = "en-tw", *, timeout: float | None = None
+    ) -> TranslationResult:
         """Translate text from one language to another.
 
         Args:
             text: The text to translate.
             language_pair: The language pair (e.g. ``"en-tw"``).
+            timeout: Seconds to wait for this call, overriding
+                ``Settings.timeout``.
 
         Returns:
             TranslationResult with the translated text and language codes.
@@ -56,12 +63,10 @@ class TranslationService:
             APIError: On HTTP errors from the API, including an unsupported
                 language pair.
         """
-        if not text.strip() or not language_pair:
-            raise TranslationError("Text and language pair are required", 400)
-        source, target = _parse_language_pair(language_pair)
+        source, target = _parse_language_pair(text, language_pair)
         logger.debug("Translating %d chars (%s)", len(text), language_pair)
         response: httpx.Response = self.http_client.request(
-            "POST", self.endpoint, json={"in": text, "lang": language_pair}
+            "POST", self.endpoint, json={"in": text, "lang": language_pair}, timeout=timeout
         )
         return TranslationResult(
             text=_translated_text(response),
@@ -71,14 +76,14 @@ class TranslationService:
         )
 
     @check_authentication
-    async def atranslate(self, text: str, language_pair: str = "en-tw") -> TranslationResult:
+    async def atranslate(
+        self, text: str, language_pair: str = "en-tw", *, timeout: float | None = None
+    ) -> TranslationResult:
         """Async version of translate."""
-        if not text.strip() or not language_pair:
-            raise TranslationError("Text and language pair are required", 400)
-        source, target = _parse_language_pair(language_pair)
+        source, target = _parse_language_pair(text, language_pair)
         logger.debug("Translating %d chars (%s)", len(text), language_pair)
         response: httpx.Response = await self.http_client.arequest(
-            "POST", self.endpoint, json={"in": text, "lang": language_pair}
+            "POST", self.endpoint, json={"in": text, "lang": language_pair}, timeout=timeout
         )
         return TranslationResult(
             text=_translated_text(response),

@@ -89,6 +89,11 @@ classDiagram
     }
 
     class APIError
+    class APIConnectionError
+    class APITimeoutError
+    class BadRequestError
+    class PermissionDeniedError
+    class NotFoundError
     class AuthenticationError
     class InsufficientCreditsError
     class PayloadTooLargeError
@@ -107,6 +112,11 @@ classDiagram
     AsrService --> BaseApi : uses
     TtsService --> BaseApi : uses
 
+    APIError <|-- APIConnectionError
+    APIConnectionError <|-- APITimeoutError
+    APIError <|-- BadRequestError
+    APIError <|-- PermissionDeniedError
+    APIError <|-- NotFoundError
     APIError <|-- AuthenticationError
     APIError <|-- InsufficientCreditsError
     APIError <|-- PayloadTooLargeError
@@ -136,14 +146,17 @@ See the [Logging guide](guides/logging.md) for how to enable and configure SDK l
 
 | HTTP status | Exception raised |
 |-------------|-----------------|
+| 400, 422 | `BadRequestError` |
 | 401 | `AuthenticationError` |
 | 402 | `InsufficientCreditsError` (not retried) |
+| 403 | `PermissionDeniedError` |
+| 404 | `NotFoundError` |
 | 413 | `PayloadTooLargeError` (not retried) |
 | 415 | `UnsupportedMediaTypeError` (not retried) |
 | 429 (retries exhausted) | `RateLimitError` |
 | 500, 502, 503, 504 (retries exhausted), other 5xx | `ServerError` |
-| Network / transport failure (retries exhausted) | `APIError` (status_code=0) |
-| Timeout after the request was sent (not retried) | `APIError` (status_code=0) |
+| Connection failure (retries exhausted) | `APIConnectionError` (status_code=0) |
+| Timeout after the request was sent (not retried) | `APITimeoutError` (status_code=0) |
 | 200 with a non-audio body (TTS) | `TTSGenerationError` |
 | 200 with a non-JSON body (translation, ASR) | `APIError` |
 | Empty text / missing file / unknown speaker (before HTTP) | Service-specific exception |

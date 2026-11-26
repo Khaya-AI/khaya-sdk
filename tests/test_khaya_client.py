@@ -14,11 +14,16 @@ import pytest
 from khaya import KhayaClient
 from khaya.config import Settings
 from khaya.exceptions import (
+    APIConnectionError,
     APIError,
+    APITimeoutError,
     ASRTranscriptionError,
     AuthenticationError,
+    BadRequestError,
     InsufficientCreditsError,
+    NotFoundError,
     PayloadTooLargeError,
+    PermissionDeniedError,
     RateLimitError,
     ServerError,
     TranslationError,
@@ -1318,3 +1323,121 @@ class TestPlatformErrorEnvelope:
         )
         assert make_client(retry_attempts=2).translate("Hello", "en-tw").text == "Maakye"
         assert route.call_count == 2
+
+
+# ---------------------------------------------------------------------------
+# Error classes by cause
+# ---------------------------------------------------------------------------
+
+
+class TestErrorClasses:
+    @pytest.mark.parametrize(
+        ("status", "expected"),
+        [
+            (400, BadRequestError),
+            (422, BadRequestError),
+            (403, PermissionDeniedError),
+            (404, NotFoundError),
+        ],
+    )
+    def test_status_maps_to_its_own_class(self, respx_mock, status, expected):
+        respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(status, json={"detail": {"error": "X", "message": "no"}})
+        )
+        with pytest.raises(expected) as exc:
+            make_client().translate("Hello", "en-tw")
+        assert exc.value.status_code == status
+
+    def test_unmapped_status_is_a_plain_api_error(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(return_value=httpx.Response(418, json={}))
+        with pytest.raises(APIError) as exc:
+            make_client().translate("Hello", "en-tw")
+        assert type(exc.value) is APIError
+
+    def test_connection_failure_is_a_connection_error(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(side_effect=httpx.ConnectError("refused"))
+        with pytest.raises(APIConnectionError) as exc:
+            make_client().translate("Hello", "en-tw")
+        assert not isinstance(exc.value, APITimeoutError)
+        assert exc.value.status_code == 0
+
+    @pytest.mark.parametrize("timeout", [httpx.ReadTimeout, httpx.ConnectTimeout])
+    def test_timeout_is_a_timeout_error(self, respx_mock, timeout):
+        respx_mock.post(TRANSLATE_URL).mock(side_effect=timeout("slow"))
+        with pytest.raises(APITimeoutError):
+            make_client().translate("Hello", "en-tw")
+
+    async def test_async_timeout_is_a_timeout_error(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(side_effect=httpx.ReadTimeout("slow"))
+        with pytest.raises(APITimeoutError):
+            await make_client().atranslate("Hello", "en-tw")
+
+    @pytest.mark.parametrize(
+        ("header", "expected"),
+        [("12", 12.0), ("Wed, 21 Oct 2026 07:28:00 GMT", None), (None, None)],
+    )
+    def test_rate_limit_error_carries_retry_after(self, respx_mock, header, expected):
+        headers = {"Retry-After": header} if header else {}
+        respx_mock.post(TRANSLATE_URL).mock(return_value=httpx.Response(429, headers=headers))
+        with pytest.raises(RateLimitError) as exc:
+            make_client().translate("Hello", "en-tw")
+        assert exc.value.retry_after == expected
+
+    def test_none_text_is_a_service_error_not_an_attribute_error(self):
+        client = make_client()
+        with pytest.raises(TranslationError):
+            client.translate(None, "en-tw")  # type: ignore[arg-type]
+        with pytest.raises(TTSGenerationError):
+            client.synthesize(None, "twi")  # type: ignore[arg-type]
+
+
+# ---------------------------------------------------------------------------
+# Per-call timeout
+# ---------------------------------------------------------------------------
+
+
+def _timeout_sent(route) -> dict:
+    return route.calls.last.request.extensions["timeout"]
+
+
+class TestPerCallTimeout:
+    def test_sync_methods_send_the_call_timeout(self, respx_mock, tmp_path):
+        audio = tmp_path / "a.wav"
+        audio.write_bytes(WAV_BYTES)
+        translate = respx_mock.post(TRANSLATE_URL).mock(return_value=httpx.Response(200, json="x"))
+        tts = respx_mock.post(TTS_URL).mock(
+            return_value=httpx.Response(200, content=WAV_BYTES, headers=AUDIO_HEADERS)
+        )
+        asr = respx_mock.post(ASR_URL).mock(return_value=httpx.Response(200, json={"text": "x"}))
+        client = make_client()
+
+        client.translate("Hello", "en-tw", timeout=2.5)
+        client.synthesize("Maakye", "twi", timeout=90)
+        client.transcribe(str(audio), "twi", timeout=120)
+
+        assert _timeout_sent(translate)["read"] == 2.5
+        assert _timeout_sent(tts)["read"] == 90
+        assert _timeout_sent(asr)["read"] == 120
+
+    async def test_async_methods_send_the_call_timeout(self, respx_mock, tmp_path):
+        audio = tmp_path / "a.wav"
+        audio.write_bytes(WAV_BYTES)
+        translate = respx_mock.post(TRANSLATE_URL).mock(return_value=httpx.Response(200, json="x"))
+        tts = respx_mock.post(TTS_URL).mock(
+            return_value=httpx.Response(200, content=WAV_BYTES, headers=AUDIO_HEADERS)
+        )
+        asr = respx_mock.post(ASR_URL).mock(return_value=httpx.Response(200, json={"text": "x"}))
+        client = make_client()
+
+        await client.atranslate("Hello", "en-tw", timeout=2.5)
+        await client.asynthesize("Maakye", "twi", timeout=90)
+        await client.atranscribe(str(audio), "twi", timeout=120)
+
+        assert _timeout_sent(translate)["read"] == 2.5
+        assert _timeout_sent(tts)["read"] == 90
+        assert _timeout_sent(asr)["read"] == 120
+
+    def test_without_one_the_settings_timeout_applies(self, respx_mock):
+        route = respx_mock.post(TRANSLATE_URL).mock(return_value=httpx.Response(200, json="x"))
+        KhayaClient(config=Settings(api_key="k", timeout=7.5)).translate("Hello", "en-tw")
+        assert _timeout_sent(route)["read"] == 7.5

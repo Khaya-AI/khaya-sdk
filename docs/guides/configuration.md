@@ -7,8 +7,8 @@
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `api_key` | `None` | Your Khaya API key |
-| `base_url` | `https://api.khaya.ai` | API base URL |
-| `timeout` | `30` | Request timeout in seconds |
+| `base_url` | `https://api.khaya.ai` | API base URL. HTTPS, or `http://localhost` for a local mock |
+| `timeout` | `30` | Default request timeout in seconds; fractions allowed |
 | `retry_attempts` | `3` | Number of attempts on transient failures |
 
 ## Environment variables
@@ -62,6 +62,17 @@ with KhayaClient(api_key="your-key", config=config) as khaya:
 ```
 
 When `config` is provided, the `api_key` argument to `KhayaClient` is ignored — the key from `Settings` is used.
+
+## Timeout for one call
+
+Every method takes a keyword-only `timeout` in seconds that overrides
+`Settings.timeout` for that call. Long audio and long text need more than a
+short translation:
+
+```python
+khaya.transcribe("interview.wav", "twi", timeout=120)
+khaya.synthesize(long_text, "twi", timeout=90)
+```
 
 ## API version
 

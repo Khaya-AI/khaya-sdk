@@ -65,23 +65,29 @@ class KhayaClient:
 
     # --- Sync API ---
 
-    def translate(self, text: str, language_pair: str = "en-tw") -> TranslationResult:
+    def translate(
+        self, text: str, language_pair: str = "en-tw", *, timeout: float | None = None
+    ) -> TranslationResult:
         """Translate text from one language to another.
 
         Args:
             text: The text to translate.
             language_pair: Source-target language pair (e.g. ``"en-tw"``).
+            timeout: Seconds to wait for this call, overriding
+                ``Settings.timeout``.
 
         Returns:
             TranslationResult with ``.text``, ``.source_language``, and ``.target_language``.
         """
-        return self.translation.translate(text, language_pair)
+        return self.translation.translate(text, language_pair, timeout=timeout)
 
     def transcribe(
         self,
         audio_file_path: str,
         language: str = "twi",
         timestamps: Granularity | None = None,
+        *,
+        timeout: float | None = None,
     ) -> TranscriptionResult:
         """Transcribe an audio file to text.
 
@@ -89,18 +95,22 @@ class KhayaClient:
             audio_file_path: Path to the .wav audio file.
             language: Language spoken in the audio (e.g. ``"twi"`` for Twi).
             timestamps: Request alignment data — ``"word"`` or ``"segment"``.
+            timeout: Seconds to wait for this call, overriding
+                ``Settings.timeout``.
 
         Returns:
             TranscriptionResult with ``.text``, ``.language``, ``.warnings``,
             and ``.timings`` when requested.
         """
-        return self.asr.transcribe(audio_file_path, language, timestamps)
+        return self.asr.transcribe(audio_file_path, language, timestamps, timeout=timeout)
 
     def synthesize(
         self,
         text: str,
         language: str,
         speaker: str | None = None,
+        *,
+        timeout: float | None = None,
     ) -> SynthesisResult:
         """Synthesize speech from text.
 
@@ -109,32 +119,40 @@ class KhayaClient:
             language: Target language code (e.g. ``"twi"`` for Asante Twi).
             speaker: Optional speaker voice — ``"male_low"``, ``"male_high"``,
                 or ``"female"``.
+            timeout: Seconds to wait for this call, overriding
+                ``Settings.timeout``.
 
         Returns:
             SynthesisResult with ``.audio`` bytes and a ``.save(path)`` helper.
         """
-        return self.tts.synthesize(text, language, speaker)
+        return self.tts.synthesize(text, language, speaker, timeout=timeout)
 
     # --- Async API ---
 
-    async def atranslate(self, text: str, language_pair: str = "en-tw") -> TranslationResult:
+    async def atranslate(
+        self, text: str, language_pair: str = "en-tw", *, timeout: float | None = None
+    ) -> TranslationResult:
         """Async version of `translate()`."""
-        return await self.translation.atranslate(text, language_pair)
+        return await self.translation.atranslate(text, language_pair, timeout=timeout)
 
     async def atranscribe(
         self,
         audio_file_path: str,
         language: str = "twi",
         timestamps: Granularity | None = None,
+        *,
+        timeout: float | None = None,
     ) -> TranscriptionResult:
         """Async version of `transcribe()`."""
-        return await self.asr.atranscribe(audio_file_path, language, timestamps)
+        return await self.asr.atranscribe(audio_file_path, language, timestamps, timeout=timeout)
 
     async def asynthesize(
         self,
         text: str,
         language: str,
         speaker: str | None = None,
+        *,
+        timeout: float | None = None,
     ) -> SynthesisResult:
         """Async version of `synthesize()`."""
-        return await self.tts.asynthesize(text, language, speaker)
+        return await self.tts.asynthesize(text, language, speaker, timeout=timeout)

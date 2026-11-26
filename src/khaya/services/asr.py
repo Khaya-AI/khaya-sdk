@@ -93,6 +93,8 @@ class AsrService:
         audio_file_path: str,
         language: str = "twi",
         timestamps: Granularity | None = None,
+        *,
+        timeout: float | None = None,
     ) -> TranscriptionResult:
         """Convert speech to text from an audio file.
 
@@ -100,6 +102,8 @@ class AsrService:
             audio_file_path: Path to the audio file (.wav).
             language: The spoken language code (e.g. ``"twi"`` for Twi).
             timestamps: Request alignment data — ``"word"`` or ``"segment"``.
+            timeout: Seconds to wait for this call, overriding
+                ``Settings.timeout``.
 
         Returns:
             TranscriptionResult with the transcribed text, any API warnings,
@@ -120,6 +124,7 @@ class AsrService:
             params=params,
             content=data,
             headers={"Content-Type": _content_type(audio_file_path)},
+            timeout=timeout,
         )
         return _to_result(response, language)
 
@@ -129,6 +134,8 @@ class AsrService:
         audio_file_path: str,
         language: str = "twi",
         timestamps: Granularity | None = None,
+        *,
+        timeout: float | None = None,
     ) -> TranscriptionResult:
         """Async version of transcribe."""
         params = _params(language, timestamps)
@@ -140,5 +147,6 @@ class AsrService:
             params=params,
             content=data,
             headers={"Content-Type": _content_type(audio_file_path)},
+            timeout=timeout,
         )
         return _to_result(response, language)
