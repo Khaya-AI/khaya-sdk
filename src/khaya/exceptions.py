@@ -46,12 +46,61 @@ class APIError(Exception):
         return " | ".join(parts)
 
 
+class APIConnectionError(APIError):
+    """The request never got an HTTP response (``status_code`` is 0).
+
+    Raised for a refused connection or DNS failure once the retries run out.
+    """
+
+
+class APITimeoutError(APIConnectionError):
+    """The request timed out.
+
+    A timeout after the request was sent is not retried: the API may still
+    have processed and billed it. Raise ``timeout`` for long audio or text.
+    """
+
+
 class AuthenticationError(APIError):
-    """Error during authentication."""
+    """The API key is missing, invalid or revoked (HTTP 401)."""
+
+
+class BadRequestError(APIError):
+    """The API rejected the request's parameters (HTTP 400 or 422).
+
+    ``details`` names each offending field. Not retried: fix the call.
+    """
+
+
+class PermissionDeniedError(APIError):
+    """The key is valid but may not do this (HTTP 403).
+
+    ``code`` says why, for example ``ROUTE_NOT_ALLOWED`` or ``SIGNUP_REQUIRED``.
+    """
+
+
+class NotFoundError(APIError):
+    """The route does not exist (HTTP 404). Check ``base_url``."""
 
 
 class RateLimitError(APIError):
-    """Error during rate limiting."""
+    """Too many requests (HTTP 429), raised once the retries run out.
+
+    Attributes:
+        retry_after: Seconds the API asked the caller to wait (its
+            ``Retry-After`` header), or None if it sent none.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        status_code: int,
+        *,
+        retry_after: float | None = None,
+        **fields: Any,
+    ):
+        super().__init__(message, status_code, **fields)
+        self.retry_after = retry_after
 
 
 class InsufficientCreditsError(APIError):
@@ -89,12 +138,12 @@ class ServerError(APIError):
 
 
 class TranslationError(APIError):
-    """Error during translation."""
+    """Bad input to ``translate()``, caught before any request is sent."""
 
 
 class TTSGenerationError(APIError):
-    """Error during TTS generation."""
+    """Bad input to ``synthesize()``, or a response that is not audio."""
 
 
 class ASRTranscriptionError(APIError):
-    """Error during ASR transcription."""
+    """Bad input to ``transcribe()``, caught before any request is sent."""

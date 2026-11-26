@@ -4,8 +4,13 @@ All exceptions inherit from `APIError` and expose `message`, `status_code`, `cod
 
 ```
 APIError
+├── APIConnectionError
+│   └── APITimeoutError
+├── BadRequestError
 ├── AuthenticationError
 ├── InsufficientCreditsError
+├── PermissionDeniedError
+├── NotFoundError
 ├── PayloadTooLargeError
 ├── UnsupportedMediaTypeError
 ├── RateLimitError
@@ -17,7 +22,17 @@ APIError
 
 ::: khaya.exceptions.APIError
 
+::: khaya.exceptions.APIConnectionError
+
+::: khaya.exceptions.APITimeoutError
+
+::: khaya.exceptions.BadRequestError
+
 ::: khaya.exceptions.AuthenticationError
+
+::: khaya.exceptions.PermissionDeniedError
+
+::: khaya.exceptions.NotFoundError
 
 ::: khaya.exceptions.InsufficientCreditsError
 

@@ -17,7 +17,7 @@ _WAV_MAGIC = b"RIFF"
 
 def _build_payload(text: str, language: str, speaker: str | None) -> dict:
     # .strip(): whitespace-only text is billed and returns invented speech.
-    if not text.strip() or not language:
+    if not isinstance(text, str) or not text.strip() or not language:
         raise TTSGenerationError("Text and language are required", 400)
     # Checked client-side to fail fast without a round trip; the API also
     # validates, returning INVALID_SPEAKER naming the accepted values.
@@ -61,6 +61,8 @@ class TtsService:
         text: str,
         language: str,
         speaker: str | None = None,
+        *,
+        timeout: float | None = None,
     ) -> SynthesisResult:
         """Convert text to speech in an African language.
 
@@ -70,6 +72,8 @@ class TtsService:
             speaker: Optional speaker voice. One of ``"male_low"``,
                 ``"male_high"``, or ``"female"``. Defaults to the API default
                 when not provided.
+            timeout: Seconds to wait for this call, overriding
+                ``Settings.timeout``.
 
         Returns:
             SynthesisResult with raw audio bytes and a save() helper.
@@ -87,7 +91,9 @@ class TtsService:
             language,
             speaker,
         )
-        response: httpx.Response = self.http_client.request("POST", self.endpoint, json=payload)
+        response: httpx.Response = self.http_client.request(
+            "POST", self.endpoint, json=payload, timeout=timeout
+        )
         result = _audio_from(response, language)
         logger.debug(
             "Synthesis complete: %d audio bytes (language=%s)",
@@ -102,6 +108,8 @@ class TtsService:
         text: str,
         language: str,
         speaker: str | None = None,
+        *,
+        timeout: float | None = None,
     ) -> SynthesisResult:
         """Async version of synthesize."""
         payload = _build_payload(text, language, speaker)
@@ -112,7 +120,7 @@ class TtsService:
             speaker,
         )
         response: httpx.Response = await self.http_client.arequest(
-            "POST", self.endpoint, json=payload
+            "POST", self.endpoint, json=payload, timeout=timeout
         )
         result = _audio_from(response, language)
         logger.debug(

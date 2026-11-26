@@ -102,3 +102,22 @@ def test_removed_version_options_are_rejected(field):
     """0.3.x selected per-service API versions; the platform has only v1."""
     with pytest.raises(ValidationError):
         Settings(api_key="k", **{field: "v1"})
+
+
+def test_timeout_accepts_fractions_of_a_second():
+    assert Settings(api_key="key", timeout=2.5).timeout == 2.5
+
+
+@pytest.mark.parametrize(
+    "url", ["http://localhost:8000", "http://127.0.0.1:8000", "http://[::1]:8000"]
+)
+def test_plain_http_is_allowed_for_this_machine(url):
+    assert Settings(api_key="key", base_url=url).base_url == url
+
+
+@pytest.mark.parametrize(
+    "url", ["http://api.khaya.ai", "http://localhost.evil.example", "ftp://localhost"]
+)
+def test_plain_http_is_refused_for_any_other_host(url):
+    with pytest.raises(ValidationError, match="HTTPS is required"):
+        Settings(api_key="key", base_url=url)
