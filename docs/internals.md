@@ -47,7 +47,7 @@ The public entry point. Holds one instance of each service and delegates every m
 
 The HTTP transport layer. Owns the `httpx.Client` (sync) and `httpx.AsyncClient` (async) instances and implements:
 
-- **Retry loop** — up to `config.retry_attempts` attempts on retryable status codes (429, 500, 502, 503, 504) and transport errors
+- **Retry loop** — up to `config.retry_attempts` attempts on retryable status codes (429, 500, 502, 503, 504) and connection failures; a timeout after sending is never retried
 - **Backoff** — exponential backoff with jitter: `delay = 2^attempt + random(0, 1)` seconds, capped at 60s; a `Retry-After` header takes precedence and is capped the same way
 - **Exception mapping** — converts HTTP error responses to the appropriate `APIError` subclass
 - **Logging** — emits `DEBUG` on every attempt and successful response; `WARNING` on retries and transport errors
@@ -143,6 +143,7 @@ See the [Logging guide](guides/logging.md) for how to enable and configure SDK l
 | 429 (retries exhausted) | `RateLimitError` |
 | 500, 502, 503, 504 (retries exhausted), other 5xx | `ServerError` |
 | Network / transport failure (retries exhausted) | `APIError` (status_code=0) |
+| Timeout after the request was sent (not retried) | `APIError` (status_code=0) |
 | 200 with a non-audio body (TTS) | `TTSGenerationError` |
 | 200 with a non-JSON body (translation, ASR) | `APIError` |
 | Empty text / missing file / unknown speaker (before HTTP) | Service-specific exception |

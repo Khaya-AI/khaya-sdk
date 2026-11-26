@@ -715,6 +715,39 @@ class TestTransportErrorRetry:
         with pytest.raises(APIError, match="Transport error"):
             await client.atranslate("Hello", "en-tw")
 
+    @pytest.mark.parametrize("timeout", [httpx.ReadTimeout, httpx.WriteTimeout])
+    def test_sync_timeout_after_sending_is_not_retried(self, respx_mock, timeout):
+        # Every endpoint is a metered POST: the server may have processed it.
+        config = Settings(api_key="test-api-key", retry_attempts=3)
+        client = KhayaClient(config=config)
+
+        route = respx_mock.post(TTS_URL).mock(side_effect=timeout("timed out"))
+        with pytest.raises(APIError, match="timed out after 30s and was not retried") as exc:
+            client.synthesize("Maakye", "twi")
+        assert route.call_count == 1
+        assert exc.value.status_code == 0
+
+    @pytest.mark.parametrize("timeout", [httpx.ReadTimeout, httpx.WriteTimeout])
+    async def test_async_timeout_after_sending_is_not_retried(self, respx_mock, timeout):
+        config = Settings(api_key="test-api-key", retry_attempts=3)
+        client = KhayaClient(config=config)
+
+        route = respx_mock.post(TTS_URL).mock(side_effect=timeout("timed out"))
+        with pytest.raises(APIError, match="timed out after 30s and was not retried"):
+            await client.asynthesize("Maakye", "twi")
+        assert route.call_count == 1
+
+    def test_connect_timeout_is_still_retried(self, respx_mock, monkeypatch):
+        # Nothing reached the server, so a retry cannot bill twice.
+        monkeypatch.setattr("time.sleep", lambda _: None)
+        config = Settings(api_key="test-api-key", retry_attempts=3)
+        client = KhayaClient(config=config)
+
+        route = respx_mock.post(TRANSLATE_URL).mock(side_effect=httpx.ConnectTimeout("slow"))
+        with pytest.raises(APIError, match="Transport error"):
+            client.translate("Hello", "en-tw")
+        assert route.call_count == 3
+
 
 # ---------------------------------------------------------------------------
 # BaseApi context manager
@@ -761,7 +794,7 @@ class TestClientLifecycle:
         with KhayaClient("test-api-key") as client:
             client.translate("Hello", "en-tw")
         api = client.http_client
-        assert api._sync_client is not None and api._sync_client.is_closed
+        assert api._sync_client is None
         assert api._async_client is None  # never created, so nothing leaked
 
     async def test_async_close_also_closes_the_sync_client(self, respx_mock):
@@ -769,9 +802,68 @@ class TestClientLifecycle:
         client = make_client()
         client.translate("Hello", "en-tw")  # creates the sync client
         await client.atranslate("Hello", "en-tw")  # creates the async client
+        api = client.http_client
+        sync_client, async_client = api._sync_client, api._async_client
+        await api.aclose()
+        assert sync_client.is_closed
+        assert async_client.is_closed
+
+    def test_sync_client_is_usable_again_after_close(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(return_value=httpx.Response(200, json="Ɛte sɛn?"))
+        client = make_client()
+        with client:
+            client.translate("Hello", "en-tw")
+        assert client.translate("Hello", "en-tw").text == "Ɛte sɛn?"
+
+    async def test_async_client_is_usable_again_after_aclose(self, respx_mock):
+        respx_mock.post(TRANSLATE_URL).mock(return_value=httpx.Response(200, json="Ɛte sɛn?"))
+        client = make_client()
+        async with client:
+            await client.atranslate("Hello", "en-tw")
+        assert (await client.atranslate("Hello", "en-tw")).text == "Ɛte sɛn?"
+
+    def test_one_client_works_across_event_loops(self, respx_mock):
+        # Each asyncio.run() is a new loop; a client bound to the first one
+        # failed on the second with "Event loop is closed".
+        respx_mock.post(TRANSLATE_URL).mock(return_value=httpx.Response(200, json="Ɛte sɛn?"))
+        client = make_client()
+        api = client.http_client
+        asyncio.run(client.atranslate("Hello", "en-tw"))
+        first = api._async_client
+        assert asyncio.run(client.atranslate("Hello", "en-tw")).text == "Ɛte sɛn?"
+        assert api._async_client is not first
+
+    async def test_sync_close_warns_about_an_open_async_client(self, respx_mock, caplog):
+        respx_mock.post(TRANSLATE_URL).mock(return_value=httpx.Response(200, json="Ɛte sɛn?"))
+        client = make_client()
+        with client:
+            await client.atranslate("Hello", "en-tw")
+        assert "cannot close the async HTTP client" in caplog.text
         await client.http_client.aclose()
-        assert client.http_client._sync_client.is_closed
-        assert client.http_client._async_client.is_closed
+
+    def test_sync_close_is_quiet_once_the_async_loop_is_gone(self, respx_mock, caplog):
+        respx_mock.post(TRANSLATE_URL).mock(return_value=httpx.Response(200, json="Ɛte sɛn?"))
+        client = make_client()
+        asyncio.run(client.atranslate("Hello", "en-tw"))
+        client.http_client.close()
+        assert caplog.text == ""
+
+
+# ---------------------------------------------------------------------------
+# Request headers
+# ---------------------------------------------------------------------------
+
+
+class TestUserAgent:
+    def test_requests_identify_the_sdk_and_its_version(self, respx_mock):
+        from khaya import __version__
+
+        route = respx_mock.post(TRANSLATE_URL).mock(
+            return_value=httpx.Response(200, json="Ɛte sɛn?")
+        )
+        make_client().translate("Hello", "en-tw")
+        user_agent = route.calls.last.request.headers["User-Agent"]
+        assert user_agent.startswith(f"khaya-python/{__version__} python/")
 
 
 # ---------------------------------------------------------------------------

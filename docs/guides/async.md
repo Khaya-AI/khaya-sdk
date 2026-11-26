@@ -23,7 +23,11 @@ async def main():
 asyncio.run(main())
 ```
 
-Use `async with` to ensure the underlying HTTP client is closed when done.
+Use `async with` to ensure the underlying HTTP client is closed when done. A
+plain `with` cannot close the async connection and logs a warning if one is open.
+
+One client can be reused across separate `asyncio.run()` calls; it opens a
+fresh connection for each event loop.
 
 ## Running requests concurrently
 

@@ -178,7 +178,7 @@ their allowance get `code == "SIGNUP_REQUIRED"`.
 
 ### Transport failures
 
-Network errors (timeouts, DNS failures) are also retried automatically. After all retries fail, an `APIError` is raised with `status_code=0`:
+Connection failures (refused, DNS, connect timeout) are retried automatically. A request that times out after it was sent is not, because the API may still have processed and billed it. Both end in an `APIError` with `status_code=0`:
 
 ```python
 except APIError as e:
@@ -188,7 +188,7 @@ except APIError as e:
 
 ## Retry behaviour
 
-The SDK retries automatically on transient errors (429, 500, 502, 503, 504, and network errors) using exponential backoff with jitter. By default, 3 attempts are made.
+The SDK retries automatically on transient errors (429, 500, 502, 503, 504, and connection failures) using exponential backoff with jitter. By default, 3 attempts are made.
 
 Configure retry behaviour via [`Settings`](../api-reference/config.md):
 
