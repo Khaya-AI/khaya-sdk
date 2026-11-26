@@ -378,7 +378,8 @@ class BaseApi:
                 raise
             except _AMBIGUOUS_TIMEOUTS as e:
                 logger.warning("Timed out, not retrying: %s %s", method, url)
-                raise APIError(_timeout_message(self.config.timeout), 0) from e
+                timeout = kwargs.get("timeout", self.config.timeout)
+                raise APIError(_timeout_message(timeout), 0) from e
             except httpx.TransportError as e:
                 if attempt < total - 1:
                     logger.warning(
@@ -450,7 +451,8 @@ class BaseApi:
                 raise
             except _AMBIGUOUS_TIMEOUTS as e:
                 logger.warning("Timed out, not retrying: %s %s", method, url)
-                raise APIError(_timeout_message(self.config.timeout), 0) from e
+                timeout = kwargs.get("timeout", self.config.timeout)
+                raise APIError(_timeout_message(timeout), 0) from e
             except httpx.TransportError as e:
                 if attempt < total - 1:
                     logger.warning(

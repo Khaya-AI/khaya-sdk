@@ -737,6 +737,16 @@ class TestTransportErrorRetry:
             await client.asynthesize("Maakye", "twi")
         assert route.call_count == 1
 
+    def test_timeout_message_reports_a_per_request_timeout(self, respx_mock):
+        respx_mock.post(TTS_URL).mock(side_effect=httpx.ReadTimeout("timed out"))
+        with pytest.raises(APIError, match="timed out after 2s"):
+            make_client().http_client.request("POST", TTS_URL, json={}, timeout=2)
+
+    async def test_async_timeout_message_reports_a_per_request_timeout(self, respx_mock):
+        respx_mock.post(TTS_URL).mock(side_effect=httpx.ReadTimeout("timed out"))
+        with pytest.raises(APIError, match="timed out after 2s"):
+            await make_client().http_client.arequest("POST", TTS_URL, json={}, timeout=2)
+
     def test_connect_timeout_is_still_retried(self, respx_mock, monkeypatch):
         # Nothing reached the server, so a retry cannot bill twice.
         monkeypatch.setattr("time.sleep", lambda _: None)
