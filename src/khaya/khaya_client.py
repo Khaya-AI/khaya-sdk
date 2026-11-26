@@ -1,6 +1,6 @@
 from khaya.config import Settings
 from khaya.models import SynthesisResult, TranscriptionResult, TranslationResult
-from khaya.services.asr import AsrService, Granularity
+from khaya.services.asr import AsrService, AudioInput, Granularity
 from khaya.services.base_api import BaseApi
 from khaya.services.translation import TranslationService
 from khaya.services.tts import TtsService
@@ -83,16 +83,18 @@ class KhayaClient:
 
     def transcribe(
         self,
-        audio_file_path: str,
+        audio: AudioInput | None = None,
         language: str = "twi",
         timestamps: Granularity | None = None,
         *,
         timeout: float | None = None,
+        audio_file_path: str | None = None,
     ) -> TranscriptionResult:
         """Transcribe an audio file to text.
 
         Args:
-            audio_file_path: Path to the .wav audio file.
+            audio: Path to the audio file, the audio as bytes, or a file
+                object opened in binary mode.
             language: Language spoken in the audio (e.g. ``"twi"`` for Twi).
             timestamps: Request alignment data — ``"word"`` or ``"segment"``.
             timeout: Seconds to wait for this call, overriding
@@ -102,7 +104,9 @@ class KhayaClient:
             TranscriptionResult with ``.text``, ``.language``, ``.warnings``,
             and ``.timings`` when requested.
         """
-        return self.asr.transcribe(audio_file_path, language, timestamps, timeout=timeout)
+        return self.asr.transcribe(
+            audio, language, timestamps, timeout=timeout, audio_file_path=audio_file_path
+        )
 
     def synthesize(
         self,
@@ -137,14 +141,17 @@ class KhayaClient:
 
     async def atranscribe(
         self,
-        audio_file_path: str,
+        audio: AudioInput | None = None,
         language: str = "twi",
         timestamps: Granularity | None = None,
         *,
         timeout: float | None = None,
+        audio_file_path: str | None = None,
     ) -> TranscriptionResult:
         """Async version of `transcribe()`."""
-        return await self.asr.atranscribe(audio_file_path, language, timestamps, timeout=timeout)
+        return await self.asr.atranscribe(
+            audio, language, timestamps, timeout=timeout, audio_file_path=audio_file_path
+        )
 
     async def asynthesize(
         self,

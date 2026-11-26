@@ -23,6 +23,23 @@ The second argument is the **language code** of the spoken language in the audio
 | `warnings` | `list[str]` | Advisories from the API, e.g. a legacy language code (see below) |
 | `timings` | `Timings \| None` | Word or segment offsets when `timestamps` is set, else `None` |
 
+## Audio from memory
+
+`transcribe()` also takes the audio itself, so an upload held in memory needs
+no temporary file. Pass `bytes` or a file object opened in binary mode:
+
+```python
+# bytes, e.g. from a web upload
+result = khaya.transcribe(uploaded.read(), "twi")
+
+# an open file or io.BytesIO
+with open("recording.wav", "rb") as f:
+    result = khaya.transcribe(f, "twi")
+```
+
+A `pathlib.Path` works too. Empty audio raises `ASRTranscriptionError` before
+any request is sent.
+
 ## Warnings from the API
 
 The API flags deprecated language codes. Those advisories arrive on
@@ -91,7 +108,7 @@ from khaya.exceptions import ASRTranscriptionError, AuthenticationError, APIErro
 try:
     result = khaya.transcribe("speech.wav", "twi")
 except ASRTranscriptionError as e:
-    # Raised when the file is not found or input is invalid
+    # Raised when the file is not found, the audio is empty, or input is invalid
     print(f"Transcription error: {e.message}")
 except AuthenticationError:
     print("Check your API key.")

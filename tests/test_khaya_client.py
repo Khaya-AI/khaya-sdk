@@ -1441,3 +1441,90 @@ class TestPerCallTimeout:
         route = respx_mock.post(TRANSLATE_URL).mock(return_value=httpx.Response(200, json="x"))
         KhayaClient(config=Settings(api_key="k", timeout=7.5)).translate("Hello", "en-tw")
         assert _timeout_sent(route)["read"] == 7.5
+
+
+# ---------------------------------------------------------------------------
+# ASR audio input: path, bytes or file object
+# ---------------------------------------------------------------------------
+
+
+class TestAsrAudioInput:
+    AUDIO = b"RIFF\x00\x00\x00\x00WAVE"
+
+    def _route(self, respx_mock):
+        return respx_mock.post(ASR_URL).mock(return_value=httpx.Response(200, json={"text": "hi"}))
+
+    @pytest.mark.parametrize("wrap", [bytes, bytearray, memoryview])
+    def test_bytes_are_uploaded_as_an_octet_stream(self, respx_mock, wrap):
+        route = self._route(respx_mock)
+        assert make_client().transcribe(wrap(self.AUDIO), "twi").text == "hi"
+        request = route.calls.last.request
+        assert request.content == self.AUDIO
+        assert request.headers["content-type"] == "application/octet-stream"
+
+    async def test_async_accepts_bytes(self, respx_mock):
+        route = self._route(respx_mock)
+        assert (await make_client().atranscribe(self.AUDIO, "twi")).text == "hi"
+        assert route.calls.last.request.content == self.AUDIO
+
+    def test_path_object_is_accepted(self, respx_mock, tmp_path):
+        route = self._route(respx_mock)
+        audio = tmp_path / "clip.wav"
+        audio.write_bytes(self.AUDIO)
+        make_client().transcribe(audio, "twi")
+        assert route.calls.last.request.content == self.AUDIO
+
+    def test_open_file_takes_its_type_from_its_name(self, respx_mock, tmp_path):
+        route = self._route(respx_mock)
+        audio = tmp_path / "clip.mp3"
+        audio.write_bytes(self.AUDIO)
+        with open(audio, "rb") as f:
+            make_client().transcribe(f, "twi")
+        request = route.calls.last.request
+        assert request.content == self.AUDIO
+        assert request.headers["content-type"] == "audio/mpeg"
+
+    def test_in_memory_file_is_accepted(self, respx_mock):
+        import io
+
+        route = self._route(respx_mock)
+        make_client().transcribe(io.BytesIO(self.AUDIO), "twi")
+        request = route.calls.last.request
+        assert request.content == self.AUDIO
+        assert request.headers["content-type"] == "application/octet-stream"
+
+    def test_text_mode_file_is_rejected(self, respx_mock):
+        import io
+
+        with pytest.raises(ASRTranscriptionError, match="binary mode"):
+            make_client().transcribe(io.StringIO("not audio"), "twi")  # type: ignore[arg-type]
+
+    @pytest.mark.parametrize("empty", [b"", "file"])
+    def test_empty_audio_is_rejected_before_any_request(self, respx_mock, tmp_path, empty):
+        route = self._route(respx_mock)
+        if empty == "file":
+            empty = tmp_path / "empty.wav"
+            empty.write_bytes(b"")
+        with pytest.raises(ASRTranscriptionError, match="Audio is empty"):
+            make_client().transcribe(empty, "twi")
+        assert route.call_count == 0
+
+    @pytest.mark.parametrize("bad", [None, 42])
+    def test_other_types_are_rejected(self, bad):
+        with pytest.raises(ASRTranscriptionError, match="must be a path, bytes"):
+            make_client().transcribe(bad, "twi")
+
+    def test_old_keyword_still_works_with_a_deprecation_warning(self, respx_mock, tmp_path):
+        route = self._route(respx_mock)
+        audio = tmp_path / "clip.wav"
+        audio.write_bytes(self.AUDIO)
+        with pytest.warns(DeprecationWarning, match="audio_file_path is deprecated"):
+            make_client().transcribe(audio_file_path=str(audio), language="twi")
+        assert route.calls.last.request.content == self.AUDIO
+
+    def test_both_names_at_once_is_an_error(self):
+        with (
+            pytest.warns(DeprecationWarning),
+            pytest.raises(ASRTranscriptionError, match="not both"),
+        ):
+            make_client().transcribe(self.AUDIO, "twi", audio_file_path="clip.wav")
