@@ -1,8 +1,10 @@
 import asyncio
 import logging
+import platform
 import random
 import re
 import time
+from importlib.metadata import version
 from typing import Any
 
 import httpx
@@ -22,6 +24,13 @@ logger = logging.getLogger(__name__)
 
 # Status codes that warrant a retry.
 _RETRYABLE_STATUS_CODES: frozenset[int] = frozenset({429, 500, 502, 503, 504})
+
+# Identifies SDK traffic and its version to the platform.
+_USER_AGENT = f"khaya-python/{version('khaya')} python/{platform.python_version()}"
+
+# Timeouts once the request is on the wire. Every endpoint is a metered POST,
+# and the server may still be processing it, so a retry can bill twice.
+_AMBIGUOUS_TIMEOUTS = (httpx.ReadTimeout, httpx.WriteTimeout)
 
 # Upper bound on a server-supplied Retry-After delay. Without a cap, a
 # misconfigured or hostile server can block the caller indefinitely.
@@ -210,6 +219,14 @@ def _retry_after_delay(response: httpx.Response | None) -> float | None:
     return max(delay, 0.0)
 
 
+def _timeout_message(timeout: float) -> str:
+    return (
+        f"Request timed out after {timeout}s and was not retried, because the "
+        "API may still have processed and billed it. Raise Settings.timeout "
+        "for long audio or text."
+    )
+
+
 class BaseApi:
     def __init__(self, config: Settings) -> None:
         self.config = config
@@ -218,6 +235,7 @@ class BaseApi:
         # would otherwise be left open when the context manager exits.
         self._sync_client: httpx.Client | None = None
         self._async_client: httpx.AsyncClient | None = None
+        self._async_loop: asyncio.AbstractEventLoop | None = None
 
     @property
     def sync_client(self) -> httpx.Client:
@@ -227,8 +245,14 @@ class BaseApi:
 
     @property
     def async_client(self) -> httpx.AsyncClient:
-        if self._async_client is None:
+        # An AsyncClient's connections belong to the loop that opened them.
+        # Each asyncio.run() starts a new loop, so a client kept across two of
+        # them would fail with "Event loop is closed". The stale one cannot be
+        # closed from here: its loop is gone.
+        loop = asyncio.get_running_loop()
+        if self._async_client is None or self._async_loop is not loop:
             self._async_client = httpx.AsyncClient(timeout=self.config.timeout)
+            self._async_loop = loop
         return self._async_client
 
     # --- Context manager (sync) ---
@@ -248,20 +272,35 @@ class BaseApi:
         await self.aclose()
 
     def close(self) -> None:
-        """Close the synchronous client, if one was created."""
+        """Close the synchronous client, if one was created.
+
+        The next request opens a fresh one, so a closed instance stays usable.
+        """
         if self._sync_client is not None:
             self._sync_client.close()
+            self._sync_client = None
+        if self._async_client is not None and not self._async_loop_is_closed():
+            logger.warning(
+                "close() cannot close the async HTTP client; "
+                "use 'async with' or 'await aclose()' after async calls"
+            )
 
     async def aclose(self) -> None:
         """Close both clients, if they were created."""
-        if self._async_client is not None:
-            await self._async_client.aclose()
+        client, self._async_client = self._async_client, None
+        # Only the loop that opened the connections can close them.
+        if client is not None and self._async_loop is asyncio.get_running_loop():
+            await client.aclose()
+        self._async_loop = None
         self.close()
+
+    def _async_loop_is_closed(self) -> bool:
+        return self._async_loop is None or self._async_loop.is_closed()
 
     def _prepare_headers(self) -> dict[str, str]:
         # No Content-Type here: httpx sets application/json for ``json=`` bodies,
         # and binary uploads must declare their own type.
-        headers = {"Cache-Control": "no-cache"}
+        headers = {"Cache-Control": "no-cache", "User-Agent": _USER_AGENT}
         # Omitted rather than sent as an empty "Bearer " token.
         if self.config.api_key:
             headers["Authorization"] = f"Bearer {self.config.api_key}"
@@ -337,6 +376,10 @@ class BaseApi:
 
             except APIError:
                 raise
+            except _AMBIGUOUS_TIMEOUTS as e:
+                logger.warning("Timed out, not retrying: %s %s", method, url)
+                timeout = kwargs.get("timeout", self.config.timeout)
+                raise APIError(_timeout_message(timeout), 0) from e
             except httpx.TransportError as e:
                 if attempt < total - 1:
                     logger.warning(
@@ -406,6 +449,10 @@ class BaseApi:
 
             except APIError:
                 raise
+            except _AMBIGUOUS_TIMEOUTS as e:
+                logger.warning("Timed out, not retrying: %s %s", method, url)
+                timeout = kwargs.get("timeout", self.config.timeout)
+                raise APIError(_timeout_message(timeout), 0) from e
             except httpx.TransportError as e:
                 if attempt < total - 1:
                     logger.warning(

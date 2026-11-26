@@ -25,7 +25,8 @@ class Settings(BaseSettings):
         retry_attempts: Total attempts per request, including the first.
     """
 
-    api_key: str | None = Field(default=None)
+    # repr=False keeps the key out of logs and tracebacks that print Settings.
+    api_key: str | None = Field(default=None, repr=False)
     base_url: str = "https://api.khaya.ai"
     timeout: int = Field(default=TIMEOUT, gt=0)
     # retry_attempts=0 would skip the request entirely.

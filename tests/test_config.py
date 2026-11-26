@@ -19,6 +19,12 @@ def test_default_config(monkeypatch):
     assert "tts" in config.endpoints
 
 
+def test_repr_does_not_expose_the_api_key():
+    config = Settings(api_key="secret-key")
+    assert "secret-key" not in repr(config)
+    assert "secret-key" not in str(config)
+
+
 def test_endpoints_include_base_url():
     config = Settings(api_key="key")
     assert config.endpoints["translation"].startswith(config.base_url)

@@ -84,7 +84,10 @@ The SDK retries automatically on:
 
 - `429 Too Many Requests` (honoring `Retry-After` header if present)
 - `500`, `502`, `503`, `504` server errors
-- Network/transport errors (connection refused, DNS failure, etc.)
+- Network errors where nothing reached the API (connection refused, DNS failure, connect timeout)
+
+A request that times out after it was sent is **not** retried: the API may
+still have processed and billed it. Raise `timeout` for long audio or text.
 
 Other 4xx errors are never retried — including **401 Unauthorized**, **402 Insufficient credits**, **413 Payload too large** and **415 Unsupported media type**.
 
